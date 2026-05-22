@@ -3,6 +3,8 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from loguru import logger
+from typing import AsyncGenerator
+
 
 # Database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@db:5432/memory_book")
@@ -45,7 +47,7 @@ def get_session_factory():
     return session_factory
 
 
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Get a database session (for dependency injection)."""
     async with session_factory() as session:
         try:

@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install system dependencies
+# Установка системных зависимостей (БЕЗ wkhtmltopdf!)
 RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libharfbuzz0b \
@@ -10,30 +10,31 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     liblcms2-dev \
     libopenjp2-7 \
-    libtiff5 \
-    wkhtmltopdf \
+    libtiff6 \
     ffmpeg \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Рабочая директория
 WORKDIR /app
 
-# Copy requirements first for better caching
+ENV PYTHONPATH=/app
+
+# Копируем зависимости первыми (для кэширования)
 COPY requirements.txt .
 
-# Install Python dependencies
+# Устанавливаем Python-пакеты
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Копируем код
 COPY . .
 
-# Create necessary directories
+# Создаём директории
 RUN mkdir -p /app/logs /app/static/uploads
 
-# Set environment variables
+# Переменные окружения
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Run the bot
+# Запуск
 CMD ["python", "bot/main.py"]

@@ -1,30 +1,46 @@
-"""Voice message handlers with Whisper.cpp transcription."""
+"""Voice message handlers with faster-whisper transcription."""
 import os
+import asyncio
 from aiogram import Dispatcher, F
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message
 from loguru import logger
 
 from db.database import get_session_factory
 from db.models import Memory
+from faster_whisper import WhisperModel
+
+# Глобальная модель whisper — загружается один раз при старте
+# Для MVP используем small (баланс скорости и качества)
+_whisper_model = None
+
+
+async def load_whisper_model():
+    """Lazy-load Whisper model in executor to avoid blocking."""
+    global _whisper_model
+    if _whisper_model is None:
+        loop = asyncio.get_event_loop()
+        # Загрузка модели в отдельном потоке (т.к. не async)
+        _whisper_model = await loop.run_in_executor(
+            None,
+            lambda: WhisperModel("small", device="cpu", compute_type="int8")
+        )
+    return _whisper_model
 
 
 async def transcribe_voice(file_path: str) -> str:
-    """Transcribe voice message using whispercpp."""
+    """Transcribe voice message using faster-whisper."""
     try:
-        from whispercpp import Whisper
         
-        # Initialize Whisper with base model
-        whisper = Whisper('base')
+        model = await load_whisper_model()
         
-        # Transcribe the audio file
-        result = whisper.transcribe(file_path)
+        # faster-whisper работает синхронно → оборачиваем в run_in_executor
+        loop = asyncio.get_event_loop()
+        segments, _ = await loop.run_in_executor(
+            None,
+            lambda: model.transcribe(file_path, beam_size=5, language="ru")
+        )
         
-        # Extract text from result
-        if isinstance(result, dict):
-            text = result.get('text', '')
-        else:
-            text = str(result)
-        
+        text = " ".join(segment.text.strip() for segment in segments)
         return text.strip()
     
     except Exception as e:
@@ -36,27 +52,29 @@ async def handle_voice_message(message: Message) -> None:
     """Handle voice messages."""
     user_id = message.from_user.id
     
-    # Get voice file
+    # Get voice file info
     voice = message.voice
     file = await message.bot.get_file(voice.file_id)
     
-    # Create temporary file path
+    # Create temp dir and path
     temp_dir = "static/uploads/voice"
     os.makedirs(temp_dir, exist_ok=True)
     file_path = os.path.join(temp_dir, f"{file.file_id}.ogg")
     
-    # Download the file
-    await message.bot.download_file(file.file_path, file_path)
+    # Download .ogg file from Telegram
+    await message.bot.download_file(file.file_path, destination=file_path)
+    
+    # Notify user
+    await message.answer("🎤 Транскрибирую голосовое сообщение...")
     
     # Transcribe
-    await message.answer("🎤 Транскрибирую голосовое сообщение...")
     transcribed_text = await transcribe_voice(file_path)
     
-    # Extract tags from transcribed text
+    # Extract hashtags
     import re
     tags = re.findall(r'#(\w+)', transcribed_text.lower())
     
-    # Save to database
+    # Save to DB
     session_factory = get_session_factory()
     async with session_factory() as session:
         memory = Memory(
@@ -69,12 +87,13 @@ async def handle_voice_message(message: Message) -> None:
         session.add(memory)
         await session.commit()
     
-    # Clean up temp file
+    # Cleanup
     try:
         os.remove(file_path)
-    except:
-        pass
+    except OSError as e:
+        logger.warning(f"Failed to delete temp file {file_path}: {e}")
     
+    # Send confirmation
     response = f"✅ <b>Голосовое сообщение сохранено!</b>\n\n"
     response += f"📝 Текст: {transcribed_text}\n"
     if tags:

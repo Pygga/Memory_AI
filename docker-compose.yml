@@ -39,7 +39,7 @@ services:
         condition: service_healthy
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      DATABASE_URL: postgresql://user:password@db:5432/memory_book
+      DATABASE_URL: postgresql+asyncpg://user:password@db:5432/memory_book
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
