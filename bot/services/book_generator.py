@@ -33,14 +33,27 @@ def group_memories_by_week(memories: list[Memory]) -> dict:
     return dict(sorted(weeks.items(), reverse=True))
 
 
-async def generate_book(user_id: int, session_factory) -> str:
+async def generate_book(user_id_tg: int, session_factory) -> str:
     """Generate a PDF book from user's memories."""
     
     # Fetch all memories for the user
     async with session_factory() as session:
+        # First get internal user.id by telegram_id
+        from db.models import User
+        from sqlalchemy import select
+        
+        result = await session.execute(
+            select(User.id).where(User.telegram_id == user_id_tg)
+        )
+        user_record = result.scalar_one_or_none()
+        
+        if not user_record:
+            raise ValueError("User not found")
+        
+        # Now fetch memories by internal user.id
         result = await session.execute(
             select(Memory)
-            .where(Memory.user_id == user_id)
+            .where(Memory.user_id == user_record)
             .order_by(Memory.created_at.desc())
         )
         memories = result.scalars().all()
@@ -72,7 +85,7 @@ async def generate_book(user_id: int, session_factory) -> str:
     output_dir.mkdir(exist_ok=True)
     
     # Generate PDF
-    pdf_path = output_dir / f"memory_book_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    pdf_path = output_dir / f"memory_book_{user_id_tg}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
     # Convert to PDF with WeasyPrint
     html = HTML(string=html_content, base_url=str(Path.cwd()))

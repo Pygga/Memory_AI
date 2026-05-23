@@ -7,6 +7,7 @@ from loguru import logger
 from db.database import get_session_factory
 from db.models import Memory, User
 from sqlalchemy import select
+from bot.keyboards.main import get_main_keyboard, get_help_keyboard
 
 
 async def cmd_start(message: Message) -> None:
@@ -38,7 +39,8 @@ async def cmd_start(message: Message) -> None:
         "/add - добавить воспоминание\n"
         "/list - список воспоминаний\n"
         "/book - сгенерировать книгу\n\n"
-        "Просто отправьте мне сообщение, и я сохраню его!"
+        "Просто отправьте мне сообщение, и я сохраню его!",
+        reply_markup=get_main_keyboard()
     )
     logger.info(f"User {message.from_user.id} started the bot")
 
@@ -61,7 +63,8 @@ async def cmd_help(message: Message) -> None:
         "/book - сгенерировать PDF-книгу\n\n"
         "<b>Генерация книги:</b>\n"
         "Отправьте /book и я создам PDF с вашими воспоминаниями!\n"
-        "Книга будет разбита на главы по неделям."
+        "Книга будет разбита на главы по неделям.",
+        reply_markup=get_help_keyboard()
     )
     logger.info(f"User {message.from_user.id} requested help")
 
@@ -73,7 +76,8 @@ async def cmd_add(message: Message) -> None:
         "Просто отправьте мне сообщение с вашим воспоминанием!\n"
         "Не забудьте добавить теги через #, например:\n"
         '"Отличный день на пляже #лето #отпуск"\n\n'
-        "Вы также можете отправить голосовое сообщение или фото."
+        "Вы также можете отправить голосовое сообщение или фото.",
+        reply_markup=get_main_keyboard()
     )
     logger.info(f"User {message.from_user.id} used /add command")
 
@@ -107,7 +111,8 @@ async def cmd_list(message: Message) -> None:
         await message.answer(
             "📭 У вас пока нет сохранённых воспоминаний.\n\n"
             "Отправьте мне сообщение, голосовую заметку или фото, "
-            "и я сохраню это как воспоминание!"
+            "и я сохраню это как воспоминание!",
+            reply_markup=get_main_keyboard()
         )
         return
     
@@ -118,7 +123,7 @@ async def cmd_list(message: Message) -> None:
         response += f"{i}. {content_preview}{tags}\n"
         response += f"   📅 {memory.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"
     
-    await message.answer(response)
+    await message.answer(response, reply_markup=get_main_keyboard())
     logger.info(f"User {user_id_tg} listed memories")
 
 
@@ -128,7 +133,8 @@ async def cmd_book(message: Message) -> None:
         "📚 <b>Генерация книги</b>\n\n"
         "Начинаю создание вашей книги воспоминаний...\n"
         "Это может занять несколько минут.\n\n"
-        "⏳ Пожалуйста, подождите."
+        "⏳ Пожалуйста, подождите.",
+        reply_markup=get_main_keyboard()
     )
     try:
         from bot.services.book_generator import generate_book
@@ -141,7 +147,8 @@ async def cmd_book(message: Message) -> None:
             await message.answer_document(
                 document=f,
                 caption="📖 Ваша книга воспоминаний готова!\n\nПриятного чтения! 🌟",
-                filename="memory_book.pdf"
+                filename="memory_book.pdf",
+                reply_markup=get_main_keyboard()
             )
         logger.info(f"Book generated for user {message.from_user.id}")
         
@@ -149,7 +156,8 @@ async def cmd_book(message: Message) -> None:
         logger.error(f"Error generating book: {e}")
         await message.answer(
             "❌ Произошла ошибка при генерации книги.\n"
-            "Пожалуйста, попробуйте позже или обратитесь к разработчику."
+            "Пожалуйста, попробуйте позже или обратитесь к разработчику.",
+            reply_markup=get_main_keyboard()
         )
 
 

@@ -13,6 +13,7 @@ from bot.handlers.text import register_text_handlers
 from bot.handlers.voice import register_voice_handlers
 from bot.handlers.photo import register_photo_handlers
 from bot.handlers.commands import register_command_handlers
+from bot.handlers.callbacks import register_callback_handlers
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +55,7 @@ async def main():
     register_text_handlers(dp)
     register_voice_handlers(dp)
     register_photo_handlers(dp)
+    register_callback_handlers(dp)
     
     logger.info("Bot handlers registered")
     
