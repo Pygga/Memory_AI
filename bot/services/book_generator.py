@@ -88,14 +88,15 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
     pdf_path = output_dir / f"memory_book_{user_id_tg}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
     # Convert to PDF with WeasyPrint
-    html = HTML(string=html_content, base_url=str(Path.cwd()))
+    from weasyprint import HTML as HTMLDocument
+    html_document = HTMLDocument(string=html_content, base_url=str(Path.cwd()))
     
     # Load CSS if exists
     if css_path.exists():
         css = CSS(str(css_path))
-        html.write_pdf(str(pdf_path), stylesheets=[css])
+        html_document.write_pdf(str(pdf_path), stylesheets=[css])
     else:
-        html.write_pdf(str(pdf_path))
+        html_document.write_pdf(str(pdf_path))
     
     logger.info(f"Generated book at {pdf_path}")
     return str(pdf_path)
