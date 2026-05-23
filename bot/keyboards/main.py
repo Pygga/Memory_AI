@@ -33,6 +33,9 @@ def get_help_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="🏷️ Работа с тегами", callback_data="help_tags"),
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Назад в меню", callback_data="main_menu"),
             ]
         ]
     )
@@ -71,6 +74,23 @@ def get_back_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="🔙 Назад", callback_data="back")
+            ]
+        ]
+    )
+    return keyboard
+
+
+def get_main_menu_inline_keyboard() -> InlineKeyboardMarkup:
+    """Create inline keyboard for main menu (for edit_text compatibility)."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📝 Добавить воспоминание", callback_data="menu_add"),
+                InlineKeyboardButton(text="📚 Мои воспоминания", callback_data="menu_list")
+            ],
+            [
+                InlineKeyboardButton(text="📖 Создать книгу", callback_data="menu_book"),
+                InlineKeyboardButton(text="❓ Помощь", callback_data="menu_help")
             ]
         ]
     )
