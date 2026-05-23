@@ -1,16 +1,19 @@
 """Voice message handlers with faster-whisper transcription."""
 import os
 import asyncio
+import re
 from aiogram import Dispatcher, F
 from aiogram.types import Message
 from loguru import logger
 
 from db.database import get_session_factory
 from db.models import Memory
+from db.users import get_or_create_user
+from utils.helpers import extract_tags
 from faster_whisper import WhisperModel
 
-# Глобальная модель whisper — загружается один раз при старте
-# Для MVP используем small (баланс скорости и качества)
+
+# Global whisper model — loaded once at startup
 _whisper_model = None
 
 
@@ -19,7 +22,6 @@ async def load_whisper_model():
     global _whisper_model
     if _whisper_model is None:
         loop = asyncio.get_event_loop()
-        # Загрузка модели в отдельном потоке (т.к. не async)
         _whisper_model = await loop.run_in_executor(
             None,
             lambda: WhisperModel("small", device="cpu", compute_type="int8")
@@ -30,16 +32,13 @@ async def load_whisper_model():
 async def transcribe_voice(file_path: str) -> str:
     """Transcribe voice message using faster-whisper."""
     try:
-        
         model = await load_whisper_model()
-        
-        # faster-whisper работает синхронно → оборачиваем в run_in_executor
         loop = asyncio.get_event_loop()
+        
         segments, _ = await loop.run_in_executor(
             None,
             lambda: model.transcribe(file_path, beam_size=5, language="ru")
         )
-        
         text = " ".join(segment.text.strip() for segment in segments)
         return text.strip()
     
@@ -50,7 +49,7 @@ async def transcribe_voice(file_path: str) -> str:
 
 async def handle_voice_message(message: Message) -> None:
     """Handle voice messages."""
-    user_id = message.from_user.id
+    user_id_tg = message.from_user.id
     
     # Get voice file info
     voice = message.voice
@@ -70,15 +69,24 @@ async def handle_voice_message(message: Message) -> None:
     # Transcribe
     transcribed_text = await transcribe_voice(file_path)
     
-    # Extract hashtags
-    import re
-    tags = re.findall(r'#(\w+)', transcribed_text.lower())
+    # Extract hashtags from transcribed text
+    tags = extract_tags(transcribed_text)
     
     # Save to DB
     session_factory = get_session_factory()
     async with session_factory() as session:
+        # Get or create user
+        user = await get_or_create_user(
+            session,
+            telegram_id=user_id_tg,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name
+        )
+        
+        # Create memory with INTERNAL user.id
         memory = Memory(
-            user_id=user_id,
+            user_id=user.id,  # ← ВАЖНО: внутренний ID из БД
             content=transcribed_text,
             memory_type="voice",
             tags=tags,
@@ -87,20 +95,19 @@ async def handle_voice_message(message: Message) -> None:
         session.add(memory)
         await session.commit()
     
-    # Cleanup
+    # Cleanup temp file
     try:
         os.remove(file_path)
     except OSError as e:
         logger.warning(f"Failed to delete temp file {file_path}: {e}")
     
     # Send confirmation
-    response = f"✅ <b>Голосовое сообщение сохранено!</b>\n\n"
-    response += f"📝 Текст: {transcribed_text}\n"
+    response = f"✅ <b>Голосовое сообщение сохранено!</b>\n\n📝 {transcribed_text}"
     if tags:
-        response += f"🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}\n"
+        response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
     
     await message.answer(response)
-    logger.info(f"Saved voice memory from user {user_id}")
+    logger.info(f"Saved voice memory from user {user_id_tg}")
 
 
 def register_voice_handlers(dp: Dispatcher) -> None:

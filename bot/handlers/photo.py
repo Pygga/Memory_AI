@@ -6,11 +6,13 @@ from loguru import logger
 
 from db.database import get_session_factory
 from db.models import Memory
+from db.users import get_or_create_user
+from utils.helpers import extract_tags
 
 
 async def handle_photo_message(message: Message) -> None:
     """Handle photo messages."""
-    user_id = message.from_user.id
+    user_id_tg = message.from_user.id
     
     # Get the best quality photo
     photo = message.photo[-1]
@@ -26,14 +28,23 @@ async def handle_photo_message(message: Message) -> None:
     
     # Get caption and extract tags
     caption = message.caption or ""
-    import re
-    tags = re.findall(r'#(\w+)', caption.lower())
+    tags = extract_tags(caption)
     
     # Save to database
     session_factory = get_session_factory()
     async with session_factory() as session:
+        # Get or create user
+        user = await get_or_create_user(
+            session,
+            telegram_id=user_id_tg,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name
+        )
+        
+        # Create memory with INTERNAL user.id
         memory = Memory(
-            user_id=user_id,
+            user_id=user.id,  # ← ВАЖНО: внутренний ID из БД
             content=caption,
             memory_type="photo",
             tags=tags,
@@ -42,15 +53,16 @@ async def handle_photo_message(message: Message) -> None:
         session.add(memory)
         await session.commit()
     
-    response = f"✅ <b>Фотография сохранена!</b>\n\n"
+    # Send confirmation
+    response = f"✅ <b>Фотография сохранена!</b>"
     if caption:
-        response += f"📝 Описание: {caption}\n"
+        response += f"\n📝 Описание: {caption}"
     if tags:
-        response += f"🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}\n"
-    response += "\nФото будет включено в вашу книгу воспоминаний!"
+        response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
+    response += "\n\nФото будет включено в вашу книгу воспоминаний!"
     
     await message.answer(response)
-    logger.info(f"Saved photo memory from user {user_id}")
+    logger.info(f"Saved photo memory from user {user_id_tg}")
 
 
 def register_photo_handlers(dp: Dispatcher) -> None:
