@@ -59,11 +59,30 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
     
     logger.info(f"Found {len(memories)} memories for user {user_id_tg}")
     
+    # Base directory definitions
+    base_dir = Path("/app")
+    
+# ✅ ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: Формируем абсолютный URL с протоколом file:// для WeasyPrint
+    for memory in memories:
+        if memory.memory_type == "photo" and memory.file_id:
+            # Путь для проверки кода Python
+            full_check_path = Path("/app/static/uploads/photos") / f"{memory.file_id}.jpg"
+            
+            if full_check_path.exists():
+                # Передаем в HTML сразу ГОТОВЫЙ абсолютный путь для WeasyPrint (3 слэша обязательны!)
+                memory.local_img_url = f"file:///app/static/uploads/photos/{memory.file_id}.jpg"
+                logger.info(f"🟢 Фото найдено и передано в HTML: {memory.local_img_url}")
+            else:
+                memory.local_img_url = None
+                logger.warning(f"🔴 ФОТО НЕ НАЙДЕНО на диске: {full_check_path}")
+        else:
+            memory.local_img_url = None
+
+    
     # 2. Group memories
     weeks = group_memories_by_week(memories)
     
-    # 3. Prepare paths (Absolute paths for Docker)
-    base_dir = Path("/app")
+    # 3. Prepare paths
     template_path = base_dir / "templates" / "book.html"
     css_path = base_dir / "static" / "css" / "book.css"
     output_dir = base_dir / "static" / "books"
@@ -96,21 +115,16 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
     try:
         logger.info("Converting HTML to PDF...")
         
-        # ✅ Создаём HTML-документ
         html_doc = HTML(string=html_content)
         
-        # ✅ Правильно создаём stylesheet: используем filename= для локальных файлов
         stylesheets = []
         if css_path.exists():
             stylesheets.append(CSS(filename=str(css_path)))
         
-        # ✅ Генерируем PDF напрямую в файл (не через bytes)
         html_doc.write_pdf(
             target=str(pdf_path),
             stylesheets=stylesheets if stylesheets else None,
-            # ✅ base_url нужен только если в HTML есть относительные пути к картинкам
-            # Если есть фото — раскомментируйте строку ниже:
-            # base_url=f"file://{base_dir}/",
+            # base_url="file:///app/"
         )
             
         logger.info(f"Book successfully generated at {pdf_path}")

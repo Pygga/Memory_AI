@@ -21,6 +21,15 @@
             }
         }
         
+        /* Стили для первой страницы (Обложки) */
+        @page :first {
+            margin: 0; /* Обложка будет на весь лист без полей */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            
+            @top-center { content: ""; }
+            @bottom-center { content: ""; }
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -36,37 +45,32 @@
         
         /* Cover Page */
         .cover {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            padding-top: 5cm;
             text-align: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             page-break-after: always;
         }
         
         .cover h1 {
-            font-size: 36pt;
+            font-size: 32pt;
             margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
         .cover .subtitle {
-            font-size: 18pt;
+            font-size: 16pt;
             opacity: 0.9;
             margin-bottom: 40px;
         }
         
         .cover .dates {
-            font-size: 14pt;
+            font-size: 12pt;
             opacity: 0.8;
+            margin-top: 3cm;
         }
         
         .cover .decorative {
-            font-size: 48pt;
-            margin: 30px 0;
+            font-size: 36pt;
+            margin: 20px 0;
         }
         
         /* Table of Contents */
@@ -127,6 +131,7 @@
             background: #f9f9f9;
             border-left: 4px solid #667eea;
             border-radius: 5px;
+            page-break-inside: avoid; /* Запрещает разрывать запись на две страницы */
         }
         
         .memory-text {
@@ -138,12 +143,16 @@
         .memory-meta {
             font-size: 9pt;
             color: #666;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            margin-top: 10px;
+            overflow: hidden; /* Очистка флоатов */
+        }
+        
+        .memory-date {
+            float: left;
         }
         
         .memory-type {
+            float: right;
             background: #667eea;
             color: white;
             padding: 2px 8px;
@@ -153,6 +162,7 @@
         
         .tags {
             margin-top: 8px;
+            clear: both;
         }
         
         .tag {
@@ -165,15 +175,17 @@
             margin-right: 5px;
         }
         
-        /* Photo placeholder */
-        .photo-placeholder {
-            background: #f0f0f0;
-            border: 2px dashed #ccc;
-            padding: 20px;
+        /* Стилизация вывода РЕАЛЬНОГО фото */
+        .memory-photo-container {
             text-align: center;
             margin: 15px 0;
-            border-radius: 5px;
-            color: #999;
+        }
+        
+        .memory-photo-container img {
+            max-width: 100%;
+            max-height: 250px; /* Ограничение под формат А5 */
+            border-radius: 4px;
+            object-fit: contain;
         }
         
         /* Stats Page */
@@ -198,13 +210,6 @@
             font-size: 36pt;
             color: #667eea;
             font-weight: bold;
-        }
-        
-        /* Footer on regular pages */
-        @page :first {
-            @top-center {
-                content: "";
-            }
         }
     </style>
 </head>
@@ -246,18 +251,21 @@
         
         {% for memory in week_data.memories %}
         <div class="memory">
+            {% if memory.content %}
             <div class="memory-text">
                 {{ memory.content }}
             </div>
+            {% endif %}
             
-            {% if memory.memory_type == 'photo' %}
-            <div class="photo-placeholder">
-                📷 Фотография
+            <!-- ✅ ВЫВОД РЕАЛЬНОГО ФОТО ВМЕСТО ЗАГЛУШКИ -->
+            {% if memory.memory_type == 'photo' and memory.local_img_url %}
+            <div class="memory-photo-container">
+                <img src="{{ memory.local_img_url }}" alt="Фотография">
             </div>
             {% endif %}
             
             <div class="memory-meta">
-                <span>{{ memory.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                <span class="memory-date">{{ memory.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
                 <span class="memory-type">
                     {% if memory.memory_type == 'text' %}📝 Текст{% endif %}
                     {% if memory.memory_type == 'voice' %}🎤 Голос{% endif %}
