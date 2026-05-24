@@ -2,22 +2,19 @@
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from jinja2 import Template
-from weasyprint import HTML, CSS
 from loguru import logger
 
-from db.models import Memory
+# ✅ ПРАВИЛЬНЫЙ ИМПОРТ: всегда импортируйте нужные классы явно
+from weasyprint import HTML, CSS
 
 
-def group_memories_by_week(memories: list[Memory]) -> dict:
+def group_memories_by_week(memories: list) -> dict:
     """Group memories by week for chapter organization."""
     weeks = {}
     
     for memory in memories:
-        # Get the week start date (Monday)
         week_start = memory.created_at - timedelta(days=memory.created_at.weekday())
         week_key = week_start.strftime("%Y-%m-%d")
         
@@ -36,11 +33,11 @@ def group_memories_by_week(memories: list[Memory]) -> dict:
 async def generate_book(user_id_tg: int, session_factory) -> str:
     """Generate a PDF book from user's memories."""
     
-    # Fetch all memories for the user
+    logger.info(f"Starting book generation for user {user_id_tg}")
+    
+    # 1. Fetch data from DB
     async with session_factory() as session:
-        # First get internal user.id by telegram_id
-        from db.models import User
-        from sqlalchemy import select
+        from db.models import User, Memory
         
         result = await session.execute(
             select(User.id).where(User.telegram_id == user_id_tg)
@@ -48,9 +45,8 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
         user_record = result.scalar_one_or_none()
         
         if not user_record:
-            raise ValueError("User not found")
+            raise ValueError("User not found in database")
         
-        # Now fetch memories by internal user.id
         result = await session.execute(
             select(Memory)
             .where(Memory.user_id == user_record)
@@ -61,17 +57,28 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
     if not memories:
         raise ValueError("No memories found for this user")
     
-    # Group memories by week
+    logger.info(f"Found {len(memories)} memories for user {user_id_tg}")
+    
+    # 2. Group memories
     weeks = group_memories_by_week(memories)
     
-    # Load template
-    template_path = Path("templates/book.html")
-    css_path = Path("static/css/book.css")
+    # 3. Prepare paths (Absolute paths for Docker)
+    base_dir = Path("/app")
+    template_path = base_dir / "templates" / "book.html"
+    css_path = base_dir / "static" / "css" / "book.css"
+    output_dir = base_dir / "static" / "books"
     
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template not found at {template_path}")
+    
+    output_dir.mkdir(exist_ok=True)
+    
+    # 4. Render HTML
     with open(template_path, "r", encoding="utf-8") as f:
-        template = Template(f.read())
+        template_content = f.read()
     
-    # Render HTML
+    template = Template(template_content)
+    
     html_content = template.render(
         weeks=weeks,
         generated_at=datetime.now(),
@@ -80,23 +87,35 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
         last_memory_date=max(m.created_at for m in memories),
     )
     
-    # Create output directory
-    output_dir = Path("static/books")
-    output_dir.mkdir(exist_ok=True)
+    logger.debug("HTML template rendered successfully")
     
-    # Generate PDF
-    pdf_path = output_dir / f"memory_book_{user_id_tg}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    # 5. Generate PDF
+    pdf_filename = f"memory_book_{user_id_tg}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    pdf_path = output_dir / pdf_filename
     
-    # Convert to PDF with WeasyPrint
-    from weasyprint import HTML as HTMLDocument
-    html_document = HTMLDocument(string=html_content, base_url=str(Path.cwd()))
-    
-    # Load CSS if exists
-    if css_path.exists():
-        css = CSS(str(css_path))
-        html_document.write_pdf(str(pdf_path), stylesheets=[css])
-    else:
-        html_document.write_pdf(str(pdf_path))
-    
-    logger.info(f"Generated book at {pdf_path}")
-    return str(pdf_path)
+    try:
+        logger.info("Converting HTML to PDF...")
+        
+        # ✅ Создаём HTML-документ
+        html_doc = HTML(string=html_content)
+        
+        # ✅ Правильно создаём stylesheet: используем filename= для локальных файлов
+        stylesheets = []
+        if css_path.exists():
+            stylesheets.append(CSS(filename=str(css_path)))
+        
+        # ✅ Генерируем PDF напрямую в файл (не через bytes)
+        html_doc.write_pdf(
+            target=str(pdf_path),
+            stylesheets=stylesheets if stylesheets else None,
+            # ✅ base_url нужен только если в HTML есть относительные пути к картинкам
+            # Если есть фото — раскомментируйте строку ниже:
+            # base_url=f"file://{base_dir}/",
+        )
+            
+        logger.info(f"Book successfully generated at {pdf_path}")
+        return str(pdf_path)
+        
+    except Exception as e:
+        logger.error(f"Critical error during PDF generation: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to generate PDF: {str(e)}")

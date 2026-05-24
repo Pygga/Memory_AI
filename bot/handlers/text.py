@@ -1,14 +1,12 @@
 """Text message handlers."""
 from aiogram import Dispatcher, F
-from aiogram.types import Message
+from aiogram.types import Message, FSInputFile  # ✅ Добавлен FSInputFile
 from loguru import logger
-
 from db.database import get_session_factory
 from db.models import Memory
 from db.users import get_or_create_user
 from utils.helpers import extract_tags
 from bot.keyboards.main import get_main_keyboard
-
 
 async def handle_menu_button(message: Message) -> None:
     """Handle main menu button clicks."""
@@ -50,25 +48,25 @@ async def handle_menu_button(message: Message) -> None:
                 .limit(10)
             )
             memories = result.scalars().all()
-        
-        if not memories:
-            await message.answer(
-                "📭 У вас пока нет сохранённых воспоминаний.\n\n"
-                "Отправьте мне сообщение, голосовую заметку или фото, "
-                "и я сохраню это как воспоминание!",
-                reply_markup=get_main_keyboard()
-            )
-            return
-        
-        response = "📚 <b>Ваши последние воспоминания:</b>\n\n"
-        for i, memory in enumerate(memories, 1):
-            content_preview = memory.content[:50] + "..." if len(memory.content) > 50 else memory.content
-            tags = f" ({', '.join(memory.tags)})" if memory.tags else ""
-            response += f"{i}. {content_preview}{tags}\n"
-            response += f"   📅 {memory.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"
-        
-        await message.answer(response, reply_markup=get_main_keyboard())
-        logger.info(f"User {user_id_tg} clicked 'My memories' button")
+            
+            if not memories:
+                await message.answer(
+                    "📭 У вас пока нет сохранённых воспоминаний.\n\n"
+                    "Отправьте мне сообщение, голосовую заметку или фото, "
+                    "и я сохраню это как воспоминание!",
+                    reply_markup=get_main_keyboard()
+                )
+                return
+            
+            response = "📚 <b>Ваши последние воспоминания:</b>\n\n"
+            for i, memory in enumerate(memories, 1):
+                content_preview = memory.content[:50] + "..." if len(memory.content) > 50 else memory.content
+                tags = f" ({', '.join(memory.tags)})" if memory.tags else ""
+                response += f"{i}. {content_preview}{tags}\n"
+                response += f" 📅 {memory.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"
+            
+            await message.answer(response, reply_markup=get_main_keyboard())
+            logger.info(f"User {user_id_tg} clicked 'My memories' button")
     
     elif text == "📖 Создать книгу":
         # Trigger the book generation logic
@@ -85,13 +83,14 @@ async def handle_menu_button(message: Message) -> None:
             session_factory = get_session_factory()
             pdf_path = await generate_book(message.from_user.id, session_factory)
             
-            with open(pdf_path, 'rb') as f:
-                await message.answer_document(
-                    document=f,
-                    caption="📖 Ваша книга воспоминаний готова!\n\nПриятного чтения! 🌟",
-                    filename="memory_book.pdf",
-                    reply_markup=get_main_keyboard()
-                )
+            # ✅ ИСПРАВЛЕНО: Отправка через FSInputFile без open()
+            document_to_send = FSInputFile(path=pdf_path, filename="memory_book.pdf")
+            
+            await message.answer_document(
+                document=document_to_send,
+                caption="📖 Ваша книга воспоминаний готова!\n\nПриятного чтения! 🌟",
+                reply_markup=get_main_keyboard()
+            )
             logger.info(f"Book generated for user {message.from_user.id}")
             
         except Exception as e:
@@ -107,7 +106,7 @@ async def handle_menu_button(message: Message) -> None:
             "ℹ️ <b>Справка по использованию бота</b>\n\n"
             "<b>Как сохранить воспоминание:</b>\n"
             "1. Отправьте текстовое сообщение\n"
-            "2. Отправьте голосовую заметку (будет транскрибирована)\n"
+            "2. Отправьте голосовою заметку (будет транскрибирована)\n"
             "3. Отправьте фотографию\n\n"
             "<b>Теги:</b>\n"
             "Используйте #теги в сообщениях для организации:\n"
@@ -124,12 +123,10 @@ async def handle_menu_button(message: Message) -> None:
         )
         logger.info(f"User {message.from_user.id} clicked 'Help' button")
 
-
 async def handle_text_message(message: Message) -> None:
     """Handle regular text messages."""
     if not message.text or message.text.startswith('/'):
         return
-
     text = message.text
     user_id_tg = message.from_user.id
     
@@ -150,7 +147,7 @@ async def handle_text_message(message: Message) -> None:
         
         # Create memory with INTERNAL user.id (not telegram_id!)
         memory = Memory(
-            user_id=user.id,  # ← ВАЖНО: внутренний ID из БД
+            user_id=user.id,
             content=text,
             memory_type="text",
             tags=tags,
@@ -163,10 +160,9 @@ async def handle_text_message(message: Message) -> None:
     response = f"✅ <b>Воспоминание сохранено!</b>\n\n📝 {text}"
     if tags:
         response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
-    
+        
     await message.answer(response)
     logger.info(f"Saved text memory from user {user_id_tg} with tags: {tags}")
-
 
 def register_text_handlers(dp: Dispatcher) -> None:
     """Register text message handlers."""
