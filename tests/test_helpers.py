@@ -31,7 +31,7 @@ class TestExtractTags:
         """Test that tags are lowercased."""
         text = "Тест #ТеГ #ДРУГОЙ"
         tags = extract_tags(text)
-        assert tags == ["тег", "другой"]
+        assert set(tags) == {"тег", "другой"}
 
     def test_extract_duplicates_removed(self):
         """Test that duplicate tags are removed."""

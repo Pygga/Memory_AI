@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime
 from sqlalchemy import select
 
-from db.models import User, Memory, MemoryType
+from db.models import User, Memory
 
 
 @pytest.mark.asyncio

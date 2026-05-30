@@ -75,7 +75,9 @@ async def handle_voice_message(message: Message) -> None:
     # Save to DB
     session_factory = get_session_factory()
     async with session_factory() as session:
-        # Get or create user
+        from db.models import User, Story
+        from sqlalchemy import select
+        
         user = await get_or_create_user(
             session,
             telegram_id=user_id_tg,
@@ -84,9 +86,16 @@ async def handle_voice_message(message: Message) -> None:
             last_name=message.from_user.last_name
         )
         
+        # Get active story
+        result = await session.execute(
+            select(Story).where(Story.user_id == user.id, Story.is_active == 1)
+        )
+        active_story = result.scalar_one_or_none()
+        
         # Create memory with INTERNAL user.id
         memory = Memory(
-            user_id=user.id,  # ← ВАЖНО: внутренний ID из БД
+            user_id=user.id,
+            story_id=active_story.id if active_story else None,
             content=transcribed_text,
             memory_type="voice",
             tags=tags,
@@ -102,7 +111,8 @@ async def handle_voice_message(message: Message) -> None:
         logger.warning(f"Failed to delete temp file {file_path}: {e}")
     
     # Send confirmation
-    response = f"✅ <b>Голосовое сообщение сохранено!</b>\n\n📝 {transcribed_text}"
+    story_context = f" в историю «{active_story.title}»" if active_story else ""
+    response = f"✅ <b>Голосовая заметка сохранена{story_context}!</b>\n\n📝 {transcribed_text}"
     if tags:
         response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
     

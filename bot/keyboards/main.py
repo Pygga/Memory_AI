@@ -7,11 +7,14 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="📝 Добавить воспоминание"),
-                KeyboardButton(text="📚 Мои воспоминания")
+                KeyboardButton(text="🆕 Начать новую книгу"),
+                KeyboardButton(text="📖 Сгенерировать PDF")
             ],
             [
-                KeyboardButton(text="📖 Создать книгу"),
+                KeyboardButton(text="📚 Архив книг"),
+                KeyboardButton(text="💎 Профиль (Подписка)")
+            ],
+            [
                 KeyboardButton(text="❓ Помощь")
             ]
         ],
@@ -95,3 +98,33 @@ def get_main_menu_inline_keyboard() -> InlineKeyboardMarkup:
         ]
     )
     return keyboard
+
+def get_theme_selection_keyboard(story_id: int) -> InlineKeyboardMarkup:
+    """Create inline keyboard for selecting book theme."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📖 Классический (Строгий)", callback_data=f"generate_book_{story_id}_classic")
+            ],
+            [
+                InlineKeyboardButton(text="✨ Современный (Яркий)", callback_data=f"generate_book_{story_id}_modern")
+            ],
+            [
+                InlineKeyboardButton(text="👔 Деловой (Минимализм)", callback_data=f"generate_book_{story_id}_business")
+            ],
+            [
+                InlineKeyboardButton(text="❌ Отмена", callback_data="back")
+            ]
+        ]
+    )
+    return keyboard
+
+def get_stories_keyboard(stories: list) -> InlineKeyboardMarkup:
+    """Create inline keyboard for selecting a story."""
+    buttons = []
+    for story in stories:
+        status = "🟢" if story.is_active else "⚪"
+        buttons.append([InlineKeyboardButton(text=f"{status} {story.title}", callback_data=f"select_story_{story.id}")])
+    
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

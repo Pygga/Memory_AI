@@ -2,14 +2,68 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Книга Воспоминаний</title>
+    <title>{{ story_title }}</title>
     <style>
+        :root {
+            /* Базовые переменные по умолчанию (classic) */
+            --font-family: "Georgia", serif;
+            --bg-color: #fff;
+            --text-color: #333;
+            --cover-bg: linear-gradient(135deg, #f5f5dc 0%, #e8e8cc 100%);
+            --cover-text: #333;
+            --primary-color: #5a4b41;
+            --border-radius: 0px;
+            --memory-bg: #f9f9f9;
+            --memory-border: 4px solid var(--primary-color);
+            --photo-border-radius: 0px;
+            --tag-bg: #e0e0e0;
+            --tag-color: #555;
+            --header-bg: var(--cover-bg);
+            --header-text: var(--cover-text);
+        }
+        
+        /* Тема: Современный */
+        body.theme-modern {
+            --font-family: "Inter", "Roboto", sans-serif;
+            --bg-color: #ffffff;
+            --text-color: #2c3e50;
+            --cover-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --cover-text: #ffffff;
+            --primary-color: #667eea;
+            --border-radius: 12px;
+            --memory-bg: #f8f9fa;
+            --memory-border: none;
+            --photo-border-radius: 12px;
+            --tag-bg: #e2e8f0;
+            --tag-color: #4a5568;
+            --header-bg: var(--cover-bg);
+            --header-text: var(--cover-text);
+        }
+        
+        /* Тема: Деловой / Минимализм */
+        body.theme-business {
+            --font-family: "Helvetica Neue", "Arial", sans-serif;
+            --bg-color: #ffffff;
+            --text-color: #1a1a1a;
+            --cover-bg: #2c3e50;
+            --cover-text: #ffffff;
+            --primary-color: #2c3e50;
+            --border-radius: 4px;
+            --memory-bg: #ffffff;
+            --memory-border: 1px solid #e0e0e0;
+            --photo-border-radius: 4px;
+            --tag-bg: #f1f1f1;
+            --tag-color: #333;
+            --header-bg: #f8f9fa;
+            --header-text: #2c3e50;
+        }
+        
         @page {
             size: A5;
             margin: 2cm;
             
             @top-center {
-                content: "Книга Воспоминаний";
+                content: ""; /* removed hardcoded title to avoid overlapping or use {{ story_title }} */
                 font-size: 10pt;
                 color: #666;
             }
@@ -21,13 +75,8 @@
             }
         }
         
-        /* Стили для первой страницы (Обложки) */
         @page :first {
-            margin: 0; /* Обложка будет на весь лист без полей */
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            
-            @top-center { content: ""; }
-            @bottom-center { content: ""; }
+            margin: 0;
         }
         
         * {
@@ -37,18 +86,41 @@
         }
         
         body {
-            font-family: "Georgia", serif;
+            font-family: var(--font-family);
             line-height: 1.6;
-            color: #333;
-            background: #fff;
+            color: var(--text-color);
+            background: var(--bg-color);
         }
         
-        /* Cover Page */
+        /* Специфично для первой страницы: задаем полный размер */
         .cover {
+            width: 148mm;
+            height: 209mm; /* 1mm less to prevent overflow to next page */
+            box-sizing: border-box;
             padding-top: 5cm;
             text-align: center;
-            color: white;
+            color: var(--cover-text);
+            background: var(--cover-bg);
             page-break-after: always;
+            overflow: hidden;
+        }
+
+        /* WeasyPrint workaround: explicit background for themes */
+        body.theme-modern .cover {
+            background: #667eea; /* fallback */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+        }
+        
+        body.theme-business .cover {
+            background: #2c3e50;
+            color: #ffffff;
+        }
+        
+        body.theme-classic .cover {
+            background: #f5f5dc; /* fallback */
+            background: linear-gradient(135deg, #f5f5dc 0%, #e8e8cc 100%);
+            color: #333;
         }
         
         .cover h1 {
@@ -82,8 +154,8 @@
         .toc h2 {
             font-size: 24pt;
             margin-bottom: 30px;
-            color: #667eea;
-            border-bottom: 2px solid #667eea;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
             padding-bottom: 10px;
         }
         
@@ -98,7 +170,7 @@
         
         .toc a {
             text-decoration: none;
-            color: #333;
+            color: var(--text-color);
         }
         
         /* Chapter Pages */
@@ -107,11 +179,17 @@
         }
         
         .chapter-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--header-bg);
+            color: var(--header-text);
             padding: 20px;
-            margin: -2cm -2cm 30px -2cm;
+            margin-bottom: 30px;
+            border-radius: var(--border-radius);
             text-align: center;
+        }
+        
+        /* Для бизнес-темы добавляем нижнюю рамку к хедеру */
+        body.theme-business .chapter-header {
+            border-bottom: 2px solid var(--primary-color);
         }
         
         .chapter-header h2 {
@@ -128,10 +206,14 @@
         .memory {
             margin-bottom: 25px;
             padding: 15px;
-            background: #f9f9f9;
-            border-left: 4px solid #667eea;
-            border-radius: 5px;
-            page-break-inside: avoid; /* Запрещает разрывать запись на две страницы */
+            background: var(--memory-bg);
+            border-left: var(--memory-border);
+            border-radius: var(--border-radius);
+            page-break-inside: avoid;
+        }
+        
+        body.theme-business .memory {
+            border-left: none;
         }
         
         .memory-text {
@@ -144,7 +226,7 @@
             font-size: 9pt;
             color: #666;
             margin-top: 10px;
-            overflow: hidden; /* Очистка флоатов */
+            overflow: hidden;
         }
         
         .memory-date {
@@ -153,8 +235,8 @@
         
         .memory-type {
             float: right;
-            background: #667eea;
-            color: white;
+            background: var(--primary-color);
+            color: #fff;
             padding: 2px 8px;
             border-radius: 10px;
             font-size: 8pt;
@@ -167,8 +249,8 @@
         
         .tag {
             display: inline-block;
-            background: #e0e0e0;
-            color: #666;
+            background: var(--tag-bg);
+            color: var(--tag-color);
             padding: 2px 6px;
             border-radius: 3px;
             font-size: 8pt;
@@ -181,11 +263,30 @@
             margin: 15px 0;
         }
         
-        .memory-photo-container img {
+        .memory-photo-fullpage img {
             max-width: 100%;
-            max-height: 250px; /* Ограничение под формат А5 */
-            border-radius: 4px;
+            max-height: 400px;
+            border-radius: var(--photo-border-radius);
             object-fit: contain;
+        }
+        
+        /* Chapter text formatting */
+        .chapter-story {
+            font-size: 12pt;
+            line-height: 1.8;
+            text-align: justify;
+        }
+        
+        .chapter-story p {
+            margin-bottom: 12px;
+            text-indent: 1.5cm; /* Paragraph indent */
+        }
+
+        .chapter-story h1, .chapter-story h2, .chapter-story h3 {
+            margin-top: 24px;
+            margin-bottom: 12px;
+            text-align: left;
+            text-indent: 0;
         }
         
         /* Stats Page */
@@ -197,7 +298,7 @@
         
         .stats h2 {
             font-size: 24pt;
-            color: #667eea;
+            color: var(--primary-color);
             margin-bottom: 30px;
         }
         
@@ -208,16 +309,16 @@
         
         .stat-number {
             font-size: 36pt;
-            color: #667eea;
+            color: var(--primary-color);
             font-weight: bold;
         }
     </style>
 </head>
-<body>
+<body class="theme-{{ theme }}">
     <!-- Cover Page -->
     <div class="cover">
         <div class="decorative">📖</div>
-        <h1>Книга Воспоминаний</h1>
+        <h1>{{ story_title }}</h1>
         <div class="subtitle">Ваши лучшие моменты</div>
         <div class="decorative">✨</div>
         <div class="dates">
@@ -249,39 +350,9 @@
             <div class="dates">{{ week_data.start_date.strftime('%d.%m.%Y') }} — {{ week_data.end_date.strftime('%d.%m.%Y') }}</div>
         </div>
         
-        {% for memory in week_data.memories %}
-        <div class="memory">
-            {% if memory.content %}
-            <div class="memory-text">
-                {{ memory.content }}
-            </div>
-            {% endif %}
-            
-            <!-- ✅ ВЫВОД РЕАЛЬНОГО ФОТО ВМЕСТО ЗАГЛУШКИ -->
-            {% if memory.memory_type == 'photo' and memory.local_img_url %}
-            <div class="memory-photo-container">
-                <img src="{{ memory.local_img_url }}" alt="Фотография">
-            </div>
-            {% endif %}
-            
-            <div class="memory-meta">
-                <span class="memory-date">{{ memory.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
-                <span class="memory-type">
-                    {% if memory.memory_type == 'text' %}📝 Текст{% endif %}
-                    {% if memory.memory_type == 'voice' %}🎤 Голос{% endif %}
-                    {% if memory.memory_type == 'photo' %}📷 Фото{% endif %}
-                </span>
-            </div>
-            
-            {% if memory.tags %}
-            <div class="tags">
-                {% for tag in memory.tags %}
-                <span class="tag">#{{ tag }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
+        <div class="chapter-story">
+            {{ week_data.story_html | safe }}
         </div>
-        {% endfor %}
     </div>
     {% endfor %}
     

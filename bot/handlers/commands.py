@@ -27,19 +27,13 @@ async def cmd_start(message: Message) -> None:
     
     await message.answer(
         "👋 <b>Добро пожаловать в Memory Book Bot!</b>\n\n"
-        "Я помогу вам сохранить ваши воспоминания и создать красивую книгу.\n\n"
-        "<b>Что я умею:</b>\n"
-        "📝 Сохранять текстовые сообщения\n"
-        "🎤 Транскрибировать голосовые заметки\n"
-        "📷 Сохранять фотографии\n"
-        "🏷️ Распознавать теги (#тег)\n"
-        "📚 Генерировать PDF-книгу\n\n"
-        "<b>Команды:</b>\n"
-        "/help - показать справку\n"
-        "/add - добавить воспоминание\n"
-        "/list - список воспоминаний\n"
-        "/book - сгенерировать книгу\n\n"
-        "Просто отправьте мне сообщение, и я сохраню его!",
+        "Я — ваш личный архивариус воспоминаний. Я помогу вам сохранить памятные моменты и превратить их в красивую книгу.\n\n"
+        "<b>Ваш план действий:</b>\n"
+        "1️⃣ Нажмите <b>«🆕 Начать новую книгу»</b> и введите название (например, 'Отпуск' или 'Дневник 2026').\n"
+        "2️⃣ Отправляйте мне текст, фото или голосовые сообщения. Я сохраню всё в вашу текущую книгу.\n"
+        "3️⃣ Добавляйте #теги к сообщениям для удобства.\n"
+        "4️⃣ Нажмите <b>«📖 Сгенерировать PDF»</b>, когда накопите достаточно моментов, и я создам для вас файл!\n\n"
+        "Готовы начать? Жмите <b>«🆕 Начать новую книгу»</b> в меню ниже!",
         reply_markup=get_main_keyboard()
     )
     logger.info(f"User {message.from_user.id} started the bot")
@@ -48,22 +42,16 @@ async def cmd_start(message: Message) -> None:
 async def cmd_help(message: Message) -> None:
     """Handle /help command."""
     await message.answer(
-        "ℹ️ <b>Справка по использованию бота</b>\n\n"
-        "<b>Как сохранить воспоминание:</b>\n"
-        "1. Отправьте текстовое сообщение\n"
-        "2. Отправьте голосовую заметку (будет транскрибирована)\n"
-        "3. Отправьте фотографию\n\n"
-        "<b>Теги:</b>\n"
-        "Используйте #теги в сообщениях для организации:\n"
-        '"Сегодня был прекрасный день #счастье #прогулка"\n\n'
-        "<b>Команды:</b>\n"
-        "/start - начать работу с ботом\n"
-        "/add - добавить воспоминание вручную\n"
-        "/list - просмотреть список воспоминаний\n"
-        "/book - сгенерировать PDF-книгу\n\n"
-        "<b>Генерация книги:</b>\n"
-        "Отправьте /book и я создам PDF с вашими воспоминаниями!\n"
-        "Книга будет разбита на главы по неделям.",
+        "ℹ️ <b>Как правильно пользоваться ботом:</b>\n\n"
+        "<b>Шаг 1: Начать книгу</b>\n"
+        "Нажмите кнопку «🆕 Начать новую книгу» и задайте название (например: 'Отпуск 2026'). Бот начнет собирать всё в эту книгу.\n\n"
+        "<b>Шаг 2: Наполняйте книгу</b>\n"
+        "Просто отправляйте боту фото, голосовые кружочки или текст. Они будут автоматически сохранены.\n\n"
+        "<b>Шаг 3: Тегируйте (по желанию)</b>\n"
+        "Используйте #теги в тексте (например: #море), чтобы воспоминания было легче находить.\n\n"
+        "<b>Шаг 4: Сгенерируйте PDF!</b>\n"
+        "Когда накопится достаточно моментов, нажмите «📖 Сгенерировать PDF». Бот попросит выбрать нужную книгу из списка, затем дизайн (Классика, Модерн, Бизнес) и сгенерирует для вас красивый PDF-файл.\n\n"
+        "<i>Вы в любой момент можете просмотреть старые записи через меню «📚 Архив книг».</i>",
         reply_markup=get_help_keyboard()
     )
     logger.info(f"User {message.from_user.id} requested help")
@@ -128,37 +116,38 @@ async def cmd_list(message: Message) -> None:
 
 
 async def cmd_book(message: Message) -> None:
-    """Handle /book command - generate PDF book."""
-    await message.answer(
-        "📚 <b>Генерация книги</b>\n\n"
-        "Начинаю создание вашей книги воспоминаний...\n"
-        "Это может занять несколько минут.\n\n"
-        "⏳ Пожалуйста, подождите.",
-        reply_markup=get_main_keyboard()
-    )
-    try:
-        from bot.services.book_generator import generate_book
-        from db.database import get_session_factory
+    """Handle /book command - show stories selection."""
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        from db.models import User, Story
+        from sqlalchemy import select
         
-        session_factory = get_session_factory()
-        pdf_path = await generate_book(message.from_user.id, session_factory)
-        
-        with open(pdf_path, 'rb') as f:
-            await message.answer_document(
-                document=f,
-                caption="📖 Ваша книга воспоминаний готова!\n\nПриятного чтения! 🌟",
-                filename="memory_book.pdf",
-                reply_markup=get_main_keyboard()
-            )
-        logger.info(f"Book generated for user {message.from_user.id}")
-        
-    except Exception as e:
-        logger.error(f"Error generating book: {e}")
-        await message.answer(
-            "❌ Произошла ошибка при генерации книги.\n"
-            "Пожалуйста, попробуйте позже или обратитесь к разработчику.",
-            reply_markup=get_main_keyboard()
+        result = await session.execute(
+            select(User.id).where(User.telegram_id == message.from_user.id)
         )
+        user_record = result.scalar_one_or_none()
+        
+        if not user_record:
+            await message.answer("Пожалуйста, сначала запустите бота командой /start")
+            return
+            
+        result = await session.execute(
+            select(Story)
+            .where(Story.user_id == user_record)
+            .order_by(Story.created_at.desc())
+        )
+        stories = result.scalars().all()
+        
+    if not stories:
+        await message.answer("У вас пока нет историй. Сначала создайте историю и добавьте воспоминания!")
+        return
+        
+    from bot.keyboards.main import get_stories_keyboard
+    await message.answer(
+        "📚 <b>Выберите историю для генерации книги:</b>",
+        reply_markup=get_stories_keyboard(stories)
+    )
+    logger.info(f"User {message.from_user.id} used /book and is selecting a story")
 
 
 def register_command_handlers(dp: Dispatcher) -> None:

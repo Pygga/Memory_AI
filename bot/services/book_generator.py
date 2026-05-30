@@ -1,5 +1,6 @@
 """Book generation service using WeasyPrint and Jinja2."""
 import os
+import markdown
 from datetime import datetime, timedelta
 from pathlib import Path
 from sqlalchemy import select
@@ -8,6 +9,7 @@ from loguru import logger
 
 # ✅ ПРАВИЛЬНЫЙ ИМПОРТ: всегда импортируйте нужные классы явно
 from weasyprint import HTML, CSS
+from bot.services.story_maker import generate_chapter_story
 
 
 def group_memories_by_week(memories: list) -> dict:
@@ -30,14 +32,14 @@ def group_memories_by_week(memories: list) -> dict:
     return dict(sorted(weeks.items(), reverse=True))
 
 
-async def generate_book(user_id_tg: int, session_factory) -> str:
+async def generate_book(user_id_tg: int, session_factory, progress_callback=None, theme: str = 'classic', story_id: int = None) -> str:
     """Generate a PDF book from user's memories."""
     
-    logger.info(f"Starting book generation for user {user_id_tg}")
+    logger.info(f"Starting book generation for user {user_id_tg} with theme {theme} and story {story_id}")
     
     # 1. Fetch data from DB
     async with session_factory() as session:
-        from db.models import User, Memory
+        from db.models import User, Memory, Story
         
         result = await session.execute(
             select(User.id).where(User.telegram_id == user_id_tg)
@@ -46,16 +48,29 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
         
         if not user_record:
             raise ValueError("User not found in database")
+            
+        story_title = "Книга Воспоминаний"
+        story_filter = True
+        
+        if story_id:
+            result = await session.execute(
+                select(Story.title).where(Story.id == story_id, Story.user_id == user_record)
+            )
+            story_title_db = result.scalar_one_or_none()
+            if story_title_db:
+                story_title = story_title_db
+            story_filter = Memory.story_id == story_id
         
         result = await session.execute(
             select(Memory)
             .where(Memory.user_id == user_record)
+            .where(story_filter)
             .order_by(Memory.created_at.desc())
         )
         memories = result.scalars().all()
     
     if not memories:
-        raise ValueError("No memories found for this user")
+        raise ValueError("No memories found for this story")
     
     logger.info(f"Found {len(memories)} memories for user {user_id_tg}")
     
@@ -82,6 +97,42 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
     # 2. Group memories
     weeks = group_memories_by_week(memories)
     
+    # 2.5 Generate stories for each week
+    total_weeks = len(weeks)
+    has_fallback = False
+    for i, (week_key, week_data) in enumerate(weeks.items(), 1):
+        if progress_callback:
+            await progress_callback(i, total_weeks)
+            
+        week_date_str = week_data['start_date'].strftime('%d.%m.%Y')
+        story_md, is_fallback = await generate_chapter_story(week_data['memories'], week_date_str)
+        if is_fallback:
+            has_fallback = True
+            
+        # Convert markdown story to HTML
+        story_html = markdown.markdown(story_md)
+        
+        # Replace [PHOTO:id] with actual HTML
+        for memory in week_data['memories']:
+            if memory.memory_type == 'photo' and memory.local_img_url:
+                photo_tag = f"[PHOTO:{memory.id}]"
+                caption_html = f'<div class="photo-caption">{memory.content}</div>' if memory.content and memory.content.strip() else ''
+                date_str = memory.created_at.strftime('%d.%m.%Y')
+                photo_html = (
+                    f'<div class="memory-photo-fullpage" style="text-align:center; margin: 30px 0; page-break-inside: avoid;">'
+                    f'<img src="{memory.local_img_url}" alt="Фотография" style="max-width:100%; max-height:400px; border-radius:var(--photo-border-radius);">'
+                    f'{caption_html}'
+                    f'<div class="photo-date" style="font-size: 9pt; color: #999; margin-top: 5px;">{date_str}</div>'
+                    f'</div>'
+                )
+                if photo_tag in story_html:
+                    story_html = story_html.replace(photo_tag, photo_html)
+                else:
+                    # Append at the end if LLM missed it
+                    story_html += photo_html
+                    
+        week_data['story_html'] = story_html
+    
     # 3. Prepare paths
     template_path = base_dir / "templates" / "book.html"
     css_path = base_dir / "static" / "css" / "book.css"
@@ -100,6 +151,8 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
     
     html_content = template.render(
         weeks=weeks,
+        theme=theme,
+        story_title=story_title,
         generated_at=datetime.now(),
         total_memories=len(memories),
         first_memory_date=min(m.created_at for m in memories),
@@ -128,7 +181,7 @@ async def generate_book(user_id_tg: int, session_factory) -> str:
         )
             
         logger.info(f"Book successfully generated at {pdf_path}")
-        return str(pdf_path)
+        return str(pdf_path), has_fallback
         
     except Exception as e:
         logger.error(f"Critical error during PDF generation: {e}", exc_info=True)

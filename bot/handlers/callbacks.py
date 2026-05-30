@@ -139,32 +139,116 @@ async def handle_callback_menu_list(callback: CallbackQuery) -> None:
 
 
 async def handle_callback_menu_book(callback: CallbackQuery) -> None:
-    """Handle menu book callback."""
+    """Handle menu book callback - show stories list first."""
     from db.database import get_session_factory
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        from db.models import User, Story
+        from sqlalchemy import select
+        
+        result = await session.execute(
+            select(User.id).where(User.telegram_id == callback.from_user.id)
+        )
+        user_record = result.scalar_one_or_none()
+        
+        if not user_record:
+            await callback.message.edit_text("Пожалуйста, сначала запустите бота командой /start")
+            await callback.answer()
+            return
+            
+        result = await session.execute(
+            select(Story)
+            .where(Story.user_id == user_record)
+            .order_by(Story.created_at.desc())
+        )
+        stories = result.scalars().all()
+        
+    if not stories:
+        await callback.message.edit_text("У вас пока нет историй. Сначала создайте историю и добавьте воспоминания!", reply_markup=get_back_keyboard())
+        await callback.answer()
+        return
+        
+    from bot.keyboards.main import get_stories_keyboard
+    await callback.message.edit_text(
+        "📚 <b>Выберите историю для генерации книги:</b>",
+        reply_markup=get_stories_keyboard(stories)
+    )
+    await callback.answer()
+    logger.info(f"User {callback.from_user.id} clicked menu_book and is selecting a story")
+
+async def handle_select_story(callback: CallbackQuery) -> None:
+    """Handle story selection - show themes."""
+    story_id = int(callback.data.replace("select_story_", ""))
+    from bot.keyboards.main import get_theme_selection_keyboard
     
     await callback.message.edit_text(
-        "📚 <b>Генерация книги</b>\n\n"
-        "Начинаю создание вашей книги воспоминаний...\n"
+        "🎨 <b>Выберите дизайн вашей книги:</b>\n\n"
+        "• <b>Классический</b> - строгий стиль, шрифты с засечками.\n"
+        "• <b>Современный</b> - яркий, с градиентами и закруглениями.\n"
+        "• <b>Деловой</b> - строгий минимализм.",
+        reply_markup=get_theme_selection_keyboard(story_id)
+    )
+    await callback.answer()
+    logger.info(f"User {callback.from_user.id} selected story {story_id} and is selecting a theme")
+
+async def handle_generate_book_theme(callback: CallbackQuery) -> None:
+    """Handle theme selection and start book generation."""
+    # data is like 'generate_book_{story_id}_{theme}'
+    parts = callback.data.split('_')
+    story_id = int(parts[2])
+    theme = parts[3]
+    
+    from db.database import get_session_factory
+    
+    status_msg = callback.message
+    await status_msg.edit_text(
+        f"📚 <b>Генерация книги (Дизайн: {theme})</b>\n\n"
+        "Начинаю создание вашей книги...\n"
         "Это может занять несколько минут.\n\n"
-        "⏳ Пожалуйста, подождите.",
-        reply_markup=get_back_keyboard()
+        "⏳ Пожалуйста, подождите."
     )
     await callback.answer()
     
     try:
         from bot.services.book_generator import generate_book
         
+        async def update_progress(current: int, total: int):
+            try:
+                await status_msg.edit_text(
+                    f"📚 <b>Генерация книги (Дизайн: {theme})</b>\n\n"
+                    f"✍️ Пишу историю... Глава {current} из {total}\n\n"
+                    f"⏳ Пожалуйста, подождите."
+                )
+            except Exception:
+                pass
+        
         session_factory = get_session_factory()
-        pdf_path = await generate_book(callback.from_user.id, session_factory)
+        pdf_path, has_fallback = await generate_book(
+            callback.from_user.id, 
+            session_factory, 
+            progress_callback=update_progress,
+            theme=theme,
+            story_id=story_id
+        )
         
-        with open(pdf_path, 'rb') as f:
-            await callback.message.answer_document(
-                document=f,
-                caption="📖 Ваша книга воспоминаний готова!\n\nПриятного чтения! 🌟",
-                filename="memory_book.pdf"
-            )
-        logger.info(f"Book generated for user {callback.from_user.id}")
+        from aiogram.types import FSInputFile
+        document_to_send = FSInputFile(path=pdf_path, filename="memory_book.pdf")
         
+        caption = "📖 Ваша книга готова!\n\nПриятного чтения! 🌟"
+        if has_fallback:
+            caption = "⚠️ <b>Вы получили базовую генерацию книги без связанных историй (ошибка подключения к нейросети). Попробуйте позже.</b>\n\n" + caption
+            
+        await callback.message.answer_document(
+            document=document_to_send,
+            caption=caption
+        )
+        await status_msg.delete()
+        logger.info(f"Book generated for user {callback.from_user.id} with theme {theme} and story {story_id}")
+        
+    except ValueError as ve:
+        logger.warning(f"Validation error during book generation: {ve}")
+        await callback.message.answer(f"❌ Невозможно создать книгу: {ve}")
+        await status_msg.delete()
     except Exception as e:
         logger.error(f"Error generating book: {e}")
         await callback.message.answer(
@@ -172,30 +256,31 @@ async def handle_callback_menu_book(callback: CallbackQuery) -> None:
             "Пожалуйста, попробуйте позже или обратитесь к разработчику."
         )
 
-
 async def handle_callback_menu_help(callback: CallbackQuery) -> None:
     """Handle menu help callback."""
     await callback.message.edit_text(
-        "ℹ️ <b>Справка по использованию бота</b>\n\n"
-        "<b>Как сохранить воспоминание:</b>\n"
-        "1. Отправьте текстовое сообщение\n"
-        "2. Отправьте голосовую заметку (будет транскрибирована)\n"
-        "3. Отправьте фотографию\n\n"
-        "<b>Теги:</b>\n"
-        "Используйте #теги в сообщениях для организации:\n"
-        '"Сегодня был прекрасный день #счастье #прогулка"\n\n'
-        "<b>Команды:</b>\n"
-        "/start - начать работу с ботом\n"
-        "/add - добавить воспоминание вручную\n"
-        "/list - просмотреть список воспоминаний\n"
-        "/book - сгенерировать PDF-книгу\n\n"
-        "<b>Генерация книги:</b>\n"
-        "Отправьте /book и я создам PDF с вашими воспоминаниями!\n"
-        "Книга будет разбита на главы по неделям.",
+        "ℹ️ <b>Как правильно пользоваться ботом:</b>\n\n"
+        "<b>Шаг 1: Начать книгу</b>\n"
+        "Нажмите кнопку «🆕 Начать новую книгу» и задайте название (например: 'Отпуск 2026'). Бот начнет собирать всё в эту книгу.\n\n"
+        "<b>Шаг 2: Наполняйте книгу</b>\n"
+        "Просто отправляйте боту фото, голосовые кружочки или текст. Они будут автоматически сохранены.\n\n"
+        "<b>Шаг 3: Тегируйте (по желанию)</b>\n"
+        "Используйте #теги в тексте (например: #море), чтобы воспоминания было легче находить.\n\n"
+        "<b>Шаг 4: Сгенерируйте PDF!</b>\n"
+        "Когда накопится достаточно моментов, нажмите «📖 Сгенерировать PDF». Бот попросит выбрать нужную книгу из списка, затем дизайн (Классика, Модерн, Бизнес) и сгенерирует для вас красивый PDF-файл.\n\n"
+        "<i>Вы в любой момент можете просмотреть старые записи через меню «📚 Архив книг».</i>",
         reply_markup=get_help_keyboard()
     )
     await callback.answer()
     logger.info(f"User {callback.from_user.id} clicked menu_help")
+
+async def handle_buy_credits(callback: CallbackQuery) -> None:
+    """Handle buy credits button (dummy for now)."""
+    await callback.answer(
+        "💳 Функция оплаты (Telegram Stars) находится в разработке! Архитектура БД уже готова.", 
+        show_alert=True
+    )
+    logger.info(f"User {callback.from_user.id} clicked buy_credits")
 
 
 async def handle_callback_confirm_yes(callback: CallbackQuery) -> None:
@@ -220,6 +305,9 @@ def register_callback_handlers(dp: Dispatcher) -> None:
     dp.callback_query.register(handle_callback_menu_add, F.data == "menu_add")
     dp.callback_query.register(handle_callback_menu_list, F.data == "menu_list")
     dp.callback_query.register(handle_callback_menu_book, F.data == "menu_book")
+    dp.callback_query.register(handle_select_story, F.data.startswith("select_story_"))
+    dp.callback_query.register(handle_generate_book_theme, F.data.startswith("generate_book_"))
+    dp.callback_query.register(handle_buy_credits, F.data == "buy_credits")
     dp.callback_query.register(handle_callback_menu_help, F.data == "menu_help")
     dp.callback_query.register(handle_callback_confirm_yes, F.data == "confirm_yes")
     dp.callback_query.register(handle_callback_confirm_no, F.data == "confirm_no")

@@ -6,124 +6,149 @@ from db.database import get_session_factory
 from db.models import Memory
 from db.users import get_or_create_user
 from utils.helpers import extract_tags
-from bot.keyboards.main import get_main_keyboard
+from bot.keyboards.main import get_main_keyboard, get_back_keyboard
 
-async def handle_menu_button(message: Message) -> None:
+from aiogram.fsm.context import FSMContext
+from bot.states import StoryStates
+
+async def handle_menu_button(message: Message, state: FSMContext) -> None:
     """Handle main menu button clicks."""
     text = message.text
     
-    if text == "📝 Добавить воспоминание":
+    if text == "🆕 Начать новую книгу":
         await message.answer(
-            "📝 <b>Добавление воспоминания</b>\n\n"
-            "Просто отправьте мне сообщение с вашим воспоминанием!\n"
-            "Не забудьте добавить теги через #, например:\n"
-            '"Отличный день на пляже #лето #отпуск"\n\n'
-            "Вы также можете отправить голосовое сообщение или фото.",
-            reply_markup=get_main_keyboard()
+            "📝 <b>Новая книга</b>\n\n"
+            "Как вы хотите назвать эту книгу? (например, 'Отпуск в горах 2026' или 'Мои выходные')\n\n"
+            "<i>Все ваши дальнейшие воспоминания будут привязываться к ней.</i>",
+            reply_markup=get_back_keyboard()
         )
-        logger.info(f"User {message.from_user.id} clicked 'Add memory' button")
-    
-    elif text == "📚 Мои воспоминания":
-        # Trigger the list command logic
-        from sqlalchemy import select
-        
-        user_id_tg = message.from_user.id
+        await state.set_state(StoryStates.waiting_for_story_title)
+        logger.info(f"User {message.from_user.id} clicked 'New book' button")
+
+    elif text == "📚 Архив книг" or text == "📖 Сгенерировать PDF":
         session_factory = get_session_factory()
-        
         async with session_factory() as session:
-            from db.models import User
+            from db.models import User, Story
+            from sqlalchemy import select
+            
             result = await session.execute(
-                select(User.id).where(User.telegram_id == user_id_tg)
+                select(User.id).where(User.telegram_id == message.from_user.id)
             )
             user_record = result.scalar_one_or_none()
             
             if not user_record:
-                await message.answer("📭 У вас пока нет сохранённых воспоминаний.")
+                await message.answer("Пожалуйста, сначала запустите бота командой /start")
                 return
-            
+                
             result = await session.execute(
-                select(Memory)
-                .where(Memory.user_id == user_record)
-                .order_by(Memory.created_at.desc())
-                .limit(10)
+                select(Story)
+                .where(Story.user_id == user_record)
+                .order_by(Story.created_at.desc())
             )
-            memories = result.scalars().all()
+            stories = result.scalars().all()
             
-            if not memories:
-                await message.answer(
-                    "📭 У вас пока нет сохранённых воспоминаний.\n\n"
-                    "Отправьте мне сообщение, голосовую заметку или фото, "
-                    "и я сохраню это как воспоминание!",
-                    reply_markup=get_main_keyboard()
-                )
-                return
+        if not stories:
+            await message.answer("У вас пока нет книг. Сначала создайте новую!")
+            return
             
-            response = "📚 <b>Ваши последние воспоминания:</b>\n\n"
-            for i, memory in enumerate(memories, 1):
-                content_preview = memory.content[:50] + "..." if len(memory.content) > 50 else memory.content
-                tags = f" ({', '.join(memory.tags)})" if memory.tags else ""
-                response += f"{i}. {content_preview}{tags}\n"
-                response += f" 📅 {memory.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"
-            
-            await message.answer(response, reply_markup=get_main_keyboard())
-            logger.info(f"User {user_id_tg} clicked 'My memories' button")
-    
-    elif text == "📖 Создать книгу":
-        # Trigger the book generation logic
-        await message.answer(
-            "📚 <b>Генерация книги</b>\n\n"
-            "Начинаю создание вашей книги воспоминаний...\n"
-            "Это может занять несколько минут.\n\n"
-            "⏳ Пожалуйста, подождите.",
-            reply_markup=get_main_keyboard()
-        )
-        try:
-            from bot.services.book_generator import generate_book
-            
-            session_factory = get_session_factory()
-            pdf_path = await generate_book(message.from_user.id, session_factory)
-            
-            # ✅ ИСПРАВЛЕНО: Отправка через FSInputFile без open()
-            document_to_send = FSInputFile(path=pdf_path, filename="memory_book.pdf")
-            
-            await message.answer_document(
-                document=document_to_send,
-                caption="📖 Ваша книга воспоминаний готова!\n\nПриятного чтения! 🌟",
-                reply_markup=get_main_keyboard()
-            )
-            logger.info(f"Book generated for user {message.from_user.id}")
-            
-        except Exception as e:
-            logger.error(f"Error generating book: {e}")
+        from bot.keyboards.main import get_stories_keyboard
+        if text == "📖 Сгенерировать PDF":
             await message.answer(
-                "❌ Произошла ошибка при генерации книги.\n"
-                "Пожалуйста, попробуйте позже или обратитесь к разработчику.",
-                reply_markup=get_main_keyboard()
+                "📚 <b>Выберите книгу для генерации PDF:</b>",
+                reply_markup=get_stories_keyboard(stories)
             )
-    
+        else:
+            await message.answer(
+                "📂 <b>Ваш архив книг:</b>\n"
+                "<i>(выберите книгу для генерации PDF)</i>",
+                reply_markup=get_stories_keyboard(stories)
+            )
+        logger.info(f"User {message.from_user.id} wants to select a story")
+        
+    elif text == "💎 Профиль (Подписка)":
+        user_id_tg = message.from_user.id
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            from db.models import User
+            from sqlalchemy import select
+            result = await session.execute(select(User).where(User.telegram_id == user_id_tg))
+            user_record = result.scalar_one_or_none()
+            
+        if user_record:
+            tier = "👑 Premium" if user_record.subscription_tier == "premium" else "🆓 Бесплатный"
+            credits = getattr(user_record, "generation_credits", 0)
+            
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            pay_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="buy_credits")]])
+            
+            await message.answer(
+                f"👤 <b>Ваш профиль:</b>\n\n"
+                f"Уровень подписки: {tier}\n"
+                f"Осталось генераций PDF: <b>{credits}</b>\n\n"
+                f"<i>(Тестовый режим: у вас {credits} генераций)</i>",
+                reply_markup=pay_kb
+            )
+        
     elif text == "❓ Помощь":
         await message.answer(
-            "ℹ️ <b>Справка по использованию бота</b>\n\n"
-            "<b>Как сохранить воспоминание:</b>\n"
-            "1. Отправьте текстовое сообщение\n"
-            "2. Отправьте голосовою заметку (будет транскрибирована)\n"
-            "3. Отправьте фотографию\n\n"
-            "<b>Теги:</b>\n"
-            "Используйте #теги в сообщениях для организации:\n"
-            '"Сегодня был прекрасный день #счастье #прогулка"\n\n'
-            "<b>Команды:</b>\n"
-            "/start - начать работу с ботом\n"
-            "/add - добавить воспоминание вручную\n"
-            "/list - просмотреть список воспоминаний\n"
-            "/book - сгенерировать PDF-книгу\n\n"
-            "<b>Генерация книги:</b>\n"
-            "Отправьте /book и я создам PDF с вашими воспоминаниями!\n"
-            "Книга будет разбита на главы по неделям.",
+            "ℹ️ <b>Как правильно пользоваться ботом:</b>\n\n"
+            "<b>Шаг 1: Начать книгу</b>\n"
+            "Нажмите кнопку «🆕 Начать новую книгу» и задайте название (например: 'Отпуск 2026'). Бот начнет собирать всё в эту книгу.\n\n"
+            "<b>Шаг 2: Наполняйте книгу</b>\n"
+            "Просто отправляйте боту фото, голосовые кружочки или текст. Они будут автоматически сохранены.\n\n"
+            "<b>Шаг 3: Тегируйте (по желанию)</b>\n"
+            "Используйте #теги в тексте (например: #море), чтобы воспоминания было легче находить.\n\n"
+            "<b>Шаг 4: Сгенерируйте PDF!</b>\n"
+            "Когда накопится достаточно моментов, нажмите «📖 Сгенерировать PDF». Бот попросит выбрать нужную книгу из списка, затем дизайн (Классика, Модерн, Бизнес) и сгенерирует для вас красивый PDF-файл.\n\n"
+            "<i>Вы в любой момент можете просмотреть старые записи через меню «📚 Архив книг».</i>",
             reply_markup=get_main_keyboard()
         )
         logger.info(f"User {message.from_user.id} clicked 'Help' button")
 
-async def handle_text_message(message: Message) -> None:
+async def handle_story_title_input(message: Message, state: FSMContext) -> None:
+    """Handle input for new story title."""
+    title = message.text.strip()
+    if not title:
+        return
+        
+    user_id_tg = message.from_user.id
+    session_factory = get_session_factory()
+    
+    async with session_factory() as session:
+        from db.models import User, Story
+        from sqlalchemy import select, update
+        
+        user = await get_or_create_user(
+            session,
+            telegram_id=user_id_tg,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name
+        )
+        
+        # Deactivate all existing stories
+        await session.execute(
+            update(Story).where(Story.user_id == user.id).values(is_active=0)
+        )
+        
+        # Create new story
+        new_story = Story(
+            user_id=user.id,
+            title=title,
+            is_active=1
+        )
+        session.add(new_story)
+        await session.commit()
+        
+    await state.clear()
+    await message.answer(
+        f"✅ <b>История «{title}» создана!</b>\n\n"
+        f"Теперь все новые воспоминания будут сохраняться в неё.",
+        reply_markup=get_main_keyboard()
+    )
+    logger.info(f"User {user_id_tg} created new story: {title}")
+
+async def handle_text_message(message: Message, state: FSMContext) -> None:
     """Handle regular text messages."""
     if not message.text or message.text.startswith('/'):
         return
@@ -136,6 +161,9 @@ async def handle_text_message(message: Message) -> None:
     # Save to database
     session_factory = get_session_factory()
     async with session_factory() as session:
+        from db.models import User, Story
+        from sqlalchemy import select
+        
         # Get or create user (returns User with .id)
         user = await get_or_create_user(
             session,
@@ -145,9 +173,16 @@ async def handle_text_message(message: Message) -> None:
             last_name=message.from_user.last_name
         )
         
-        # Create memory with INTERNAL user.id (not telegram_id!)
+        # Get active story
+        result = await session.execute(
+            select(Story).where(Story.user_id == user.id, Story.is_active == 1)
+        )
+        active_story = result.scalar_one_or_none()
+        
+        # Create memory with INTERNAL user.id and active story_id
         memory = Memory(
             user_id=user.id,
+            story_id=active_story.id if active_story else None,
             content=text,
             memory_type="text",
             tags=tags,
@@ -157,7 +192,8 @@ async def handle_text_message(message: Message) -> None:
         await session.commit()
     
     # Send confirmation
-    response = f"✅ <b>Воспоминание сохранено!</b>\n\n📝 {text}"
+    story_context = f" в историю «{active_story.title}»" if active_story else ""
+    response = f"✅ <b>Воспоминание сохранено{story_context}!</b>\n\n📝 {text}"
     if tags:
         response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
         
@@ -166,10 +202,13 @@ async def handle_text_message(message: Message) -> None:
 
 def register_text_handlers(dp: Dispatcher) -> None:
     """Register text message handlers."""
+    # FSM state handler for new story title
+    dp.message.register(handle_story_title_input, StoryStates.waiting_for_story_title)
+    
     # Register menu button handler first (higher priority)
     dp.message.register(
         handle_menu_button,
-        F.text.in_(["📝 Добавить воспоминание", "📚 Мои воспоминания", "📖 Создать книгу", "❓ Помощь"])
+        F.text.in_(["🆕 Начать новую книгу", "📖 Сгенерировать PDF", "📚 Архив книг", "💎 Профиль (Подписка)", "❓ Помощь"])
     )
     # Then register regular text handler
     dp.message.register(handle_text_message, F.text & ~F.text.startswith('/'))

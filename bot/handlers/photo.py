@@ -33,6 +33,9 @@ async def handle_photo_message(message: Message) -> None:
     # Save to database
     session_factory = get_session_factory()
     async with session_factory() as session:
+        from db.models import User, Story
+        from sqlalchemy import select
+        
         # Get or create user
         user = await get_or_create_user(
             session,
@@ -42,9 +45,16 @@ async def handle_photo_message(message: Message) -> None:
             last_name=message.from_user.last_name
         )
         
-        # Create memory with INTERNAL user.id
+        # Get active story
+        result = await session.execute(
+            select(Story).where(Story.user_id == user.id, Story.is_active == 1)
+        )
+        active_story = result.scalar_one_or_none()
+        
+        # Create memory with INTERNAL user.id and story_id
         memory = Memory(
-            user_id=user.id,  # ← ВАЖНО: внутренний ID из БД
+            user_id=user.id,
+            story_id=active_story.id if active_story else None,
             content=caption,
             memory_type="photo",
             tags=tags,
@@ -52,9 +62,10 @@ async def handle_photo_message(message: Message) -> None:
         )
         session.add(memory)
         await session.commit()
-    
+        
     # Send confirmation
-    response = f"✅ <b>Фотография сохранена!</b>"
+    story_context = f" в историю «{active_story.title}»" if active_story else ""
+    response = f"✅ <b>Фотография сохранена{story_context}!</b>"
     if caption:
         response += f"\n📝 Описание: {caption}"
     if tags:
