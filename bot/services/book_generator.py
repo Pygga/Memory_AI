@@ -32,7 +32,7 @@ def group_memories_by_week(memories: list) -> dict:
     return dict(sorted(weeks.items(), reverse=True))
 
 
-async def generate_book(user_id_tg: int, session_factory, progress_callback=None, theme: str = 'classic', story_id: int = None) -> str:
+async def generate_book(user_id_tg: int, session_factory, progress_callback=None, theme: str = 'classic', story_id: int = None, signature: str = None) -> str:
     """Generate a PDF book from user's memories."""
     
     logger.info(f"Starting book generation for user {user_id_tg} with theme {theme} and story {story_id}")
@@ -109,6 +109,30 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
         if is_fallback:
             has_fallback = True
             
+        # Extract title from markdown if possible
+        title = f"Неделя от {week_date_str}"
+        if not is_fallback:
+            lines = story_md.strip().split('\n')
+            clean_lines = []
+            found_title = False
+            for line in lines:
+                stripped_line = line.strip()
+                if not found_title and stripped_line.startswith('# '):
+                    title = stripped_line[2:].strip().strip('*').strip('_').strip('"').strip("'")
+                    found_title = True
+                elif not found_title and stripped_line.lower().startswith('title:'):
+                    title = stripped_line[6:].strip().strip('*').strip('_').strip('"').strip("'")
+                    found_title = True
+                elif not found_title and stripped_line.lower().startswith('название:'):
+                    title = stripped_line[9:].strip().strip('*').strip('_').strip('"').strip("'")
+                    found_title = True
+                else:
+                    clean_lines.append(line)
+            if found_title:
+                story_md = '\n'.join(clean_lines).strip()
+        
+        week_data['title'] = title
+            
         # Convert markdown story to HTML
         story_html = markdown.markdown(story_md)
         
@@ -157,6 +181,7 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
         total_memories=len(memories),
         first_memory_date=min(m.created_at for m in memories),
         last_memory_date=max(m.created_at for m in memories),
+        signature=signature,
     )
     
     logger.debug("HTML template rendered successfully")

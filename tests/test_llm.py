@@ -56,9 +56,10 @@ async def test_generate_chapter_story_success(mock_redis, mock_get_client, mock_
     mock_redis_client.get.return_value = None
     mock_redis.return_value = mock_redis_client
     
-    story = await generate_chapter_story(mock_memories, "01.10.2023")
+    story, is_fallback = await generate_chapter_story(mock_memories, "01.10.2023")
     
     assert story == "Generated cohesive story"
+    assert is_fallback is False
     mock_client.generate_text.assert_called_once()
     mock_redis_client.set.assert_called_once()
 
@@ -75,17 +76,19 @@ async def test_generate_chapter_story_fallback(mock_redis, mock_get_client, mock
     mock_redis_client.get.return_value = None
     mock_redis.return_value = mock_redis_client
     
-    story = await generate_chapter_story(mock_memories, "01.10.2023")
+    story, is_fallback = await generate_chapter_story(mock_memories, "01.10.2023")
     
     assert "Went to the park" in story
     assert "Had a great dinner" in story
     assert "Generated cohesive story" not in story
+    assert is_fallback is True
 
 @pytest.mark.asyncio
 async def test_generate_chapter_story_empty():
     """Test with empty memories."""
-    story = await generate_chapter_story([], "01.10.2023")
+    story, is_fallback = await generate_chapter_story([], "01.10.2023")
     assert story == ""
+    assert is_fallback is False
 
 @patch.dict('os.environ', {'LLM_PROVIDER': 'groq'})
 def test_get_llm_client_groq():

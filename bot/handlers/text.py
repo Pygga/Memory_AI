@@ -10,6 +10,7 @@ from bot.keyboards.main import get_main_keyboard, get_back_keyboard
 
 from aiogram.fsm.context import FSMContext
 from bot.states import StoryStates
+from bot.handlers.callbacks import start_book_generation
 
 async def handle_menu_button(message: Message, state: FSMContext) -> None:
     """Handle main menu button clicks."""
@@ -148,6 +149,24 @@ async def handle_story_title_input(message: Message, state: FSMContext) -> None:
     )
     logger.info(f"User {user_id_tg} created new story: {title}")
 
+async def handle_signature_input(message: Message, state: FSMContext) -> None:
+    """Handle text input for custom book signature and start generation."""
+    signature = message.text.strip()
+    
+    state_data = await state.get_data()
+    story_id = state_data.get("story_id")
+    theme = state_data.get("theme")
+    
+    if not story_id or not theme:
+        await message.answer("❌ Произошла ошибка. Пожалуйста, начните генерацию заново.")
+        await state.clear()
+        return
+        
+    await state.clear()
+    
+    # Start generation with custom signature
+    await start_book_generation(message, message.from_user.id, story_id, theme, signature=signature)
+
 async def handle_text_message(message: Message, state: FSMContext) -> None:
     """Handle regular text messages."""
     if not message.text or message.text.startswith('/'):
@@ -202,6 +221,9 @@ async def handle_text_message(message: Message, state: FSMContext) -> None:
 
 def register_text_handlers(dp: Dispatcher) -> None:
     """Register text message handlers."""
+    # FSM state handler for custom signature
+    dp.message.register(handle_signature_input, StoryStates.waiting_for_signature)
+    
     # FSM state handler for new story title
     dp.message.register(handle_story_title_input, StoryStates.waiting_for_story_title)
     

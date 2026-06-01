@@ -128,3 +128,17 @@ def get_stories_keyboard(stories: list) -> InlineKeyboardMarkup:
     
     buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_skip_signature_keyboard() -> InlineKeyboardMarkup:
+    """Create inline keyboard to skip final signature."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="⏩ Пропустить (без подписи)", callback_data="skip_signature")
+            ],
+            [
+                InlineKeyboardButton(text="❌ Отмена", callback_data="back")
+            ]
+        ]
+    )
+    return keyboard

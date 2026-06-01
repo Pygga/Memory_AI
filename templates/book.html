@@ -1,30 +1,39 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <title>{{ story_title }}</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+
         :root {
             /* Базовые переменные по умолчанию (classic) */
-            --font-family: "Georgia", serif;
-            --bg-color: #fff;
+            --font-family: "EB Garamond", "Georgia", serif;
+            --heading-font: "Playfair Display", "Georgia", serif;
+            --bg-color: #fdfbf7;
+            /* Изысканная теплая бумага цвета слоновой кости */
             --text-color: #333;
             --cover-bg: linear-gradient(135deg, #f5f5dc 0%, #e8e8cc 100%);
             --cover-text: #333;
             --primary-color: #5a4b41;
-            --border-radius: 0px;
-            --memory-bg: #f9f9f9;
+            --border-radius: 6px;
+            /* Мягкие скругления блоков воспоминаний */
+            --memory-bg: #f5f2eb;
+            /* Теплый бежевый тон для воспоминаний */
             --memory-border: 4px solid var(--primary-color);
-            --photo-border-radius: 0px;
+            --photo-border-radius: 8px;
+            /* Премиальные скругленные углы для фото */
             --tag-bg: #e0e0e0;
             --tag-color: #555;
             --header-bg: var(--cover-bg);
             --header-text: var(--cover-text);
         }
-        
+
         /* Тема: Современный */
         body.theme-modern {
             --font-family: "Inter", "Roboto", sans-serif;
+            --heading-font: "Montserrat", "Roboto", sans-serif;
             --bg-color: #ffffff;
             --text-color: #2c3e50;
             --cover-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -39,10 +48,11 @@
             --header-bg: var(--cover-bg);
             --header-text: var(--cover-text);
         }
-        
+
         /* Тема: Деловой / Минимализм */
         body.theme-business {
             --font-family: "Helvetica Neue", "Arial", sans-serif;
+            --heading-font: "Helvetica Neue", "Arial", sans-serif;
             --bg-color: #ffffff;
             --text-color: #1a1a1a;
             --cover-bg: #2c3e50;
@@ -57,47 +67,73 @@
             --header-bg: #f8f9fa;
             --header-text: #2c3e50;
         }
-        
+
         @page {
             size: A5;
             margin: 2cm;
-            
+            background: var(--bg-color);
+            /* Фоновый цвет страниц до самых краев */
+
             @top-center {
-                content: ""; /* removed hardcoded title to avoid overlapping or use {{ story_title }} */
+                content: "";
+                /* removed hardcoded title to avoid overlapping or use {{ story_title }} */
                 font-size: 10pt;
                 color: #666;
             }
-            
+
             @bottom-center {
                 content: counter(page);
                 font-size: 10pt;
                 color: #666;
             }
         }
-        
-        @page :first {
+
+        @page cover-page {
+            size: A5;
             margin: 0;
+
+            @bottom-center {
+                content: none;
+            }
+
+            @top-center {
+                content: none;
+            }
         }
-        
+
+        @page end-page {
+            size: A5;
+            margin: 0;
+
+            @bottom-center {
+                content: none;
+            }
+
+            @top-center {
+                content: none;
+            }
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: var(--font-family);
             line-height: 1.6;
             color: var(--text-color);
             background: var(--bg-color);
         }
-        
+
         /* Специфично для первой страницы: задаем полный размер */
         .cover {
+            page: cover-page;
             width: 148mm;
-            height: 209mm; /* 1mm less to prevent overflow to next page */
+            height: 210mm;
             box-sizing: border-box;
-            padding-top: 5cm;
+            padding: 5cm 2cm 2cm 2cm;
             text-align: center;
             color: var(--cover-text);
             background: var(--cover-bg);
@@ -106,51 +142,57 @@
         }
 
         /* WeasyPrint workaround: explicit background for themes */
-        body.theme-modern .cover {
-            background: #667eea; /* fallback */
+        body.theme-modern .cover,
+        body.theme-modern .back-cover {
+            background: #667eea;
+            /* fallback */
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #ffffff;
         }
-        
-        body.theme-business .cover {
+
+        body.theme-business .cover,
+        body.theme-business .back-cover {
             background: #2c3e50;
             color: #ffffff;
         }
-        
-        body.theme-classic .cover {
-            background: #f5f5dc; /* fallback */
+
+        body.theme-classic .cover,
+        body.theme-classic .back-cover {
+            background: #f5f5dc;
+            /* fallback */
             background: linear-gradient(135deg, #f5f5dc 0%, #e8e8cc 100%);
             color: #333;
         }
-        
+
         .cover h1 {
+            font-family: var(--heading-font);
             font-size: 32pt;
             margin-bottom: 20px;
         }
-        
+
         .cover .subtitle {
             font-size: 16pt;
             opacity: 0.9;
             margin-bottom: 40px;
         }
-        
+
         .cover .dates {
             font-size: 12pt;
             opacity: 0.8;
             margin-top: 3cm;
         }
-        
+
         .cover .decorative {
             font-size: 36pt;
             margin: 20px 0;
         }
-        
+
         /* Table of Contents */
         .toc {
             page-break-after: always;
             padding: 40px 0;
         }
-        
+
         .toc h2 {
             font-size: 24pt;
             margin-bottom: 30px;
@@ -158,50 +200,99 @@
             border-bottom: 2px solid var(--primary-color);
             padding-bottom: 10px;
         }
-        
+
         .toc ul {
             list-style: none;
+            padding: 0;
         }
-        
-        .toc li {
-            margin: 15px 0;
+
+        .toc-item {
+            margin: 20px 0;
             font-size: 12pt;
         }
-        
-        .toc a {
+
+        .toc-item a {
+            display: flex;
+            align-items: flex-end;
             text-decoration: none;
             color: var(--text-color);
+            width: 100%;
         }
-        
+
+        .toc-name {
+            order: 1;
+            font-weight: bold;
+        }
+
+        .toc-subtitle {
+            display: block;
+            font-size: 9pt;
+            color: #666;
+            margin-top: 4px;
+            font-weight: normal;
+        }
+
+        .toc-dots {
+            flex-grow: 1;
+            border-bottom: 1px dotted #bbb;
+            margin: 0 10px 5px 10px;
+            order: 2;
+        }
+
+        .toc-page {
+            order: 3;
+            color: var(--primary-color);
+            font-weight: bold;
+            background: var(--bg-color);
+            padding-left: 5px;
+        }
+
+        .toc-page::after {
+            content: target-counter(attr(href), page);
+        }
+
         /* Chapter Pages */
         .chapter {
-            page-break-after: always;
+            page-break-before: always;
+            padding-top: 1cm;
         }
-        
+
         .chapter-header {
-            background: var(--header-bg);
-            color: var(--header-text);
-            padding: 20px;
-            margin-bottom: 30px;
-            border-radius: var(--border-radius);
-            text-align: center;
+            text-align: left;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--primary-color);
+            padding-bottom: 15px;
         }
-        
+
         /* Для бизнес-темы добавляем нижнюю рамку к хедеру */
         body.theme-business .chapter-header {
-            border-bottom: 2px solid var(--primary-color);
+            border-bottom: 3px solid var(--primary-color);
         }
-        
+
+        .chapter-num {
+            font-size: 11pt;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
         .chapter-header h2 {
-            font-size: 20pt;
-            margin-bottom: 5px;
+            font-size: 22pt;
+            margin-bottom: 8px;
+            color: var(--text-color);
+            font-family: var(--font-family);
+            line-height: 1.2;
+            text-align: left;
         }
-        
+
         .chapter-header .dates {
-            font-size: 12pt;
-            opacity: 0.9;
+            font-size: 10pt;
+            color: #666;
+            font-style: italic;
         }
-        
+
         /* Memory Entries */
         .memory {
             margin-bottom: 25px;
@@ -211,28 +302,28 @@
             border-radius: var(--border-radius);
             page-break-inside: avoid;
         }
-        
+
         body.theme-business .memory {
             border-left: none;
         }
-        
+
         .memory-text {
             font-size: 11pt;
             line-height: 1.7;
             margin-bottom: 10px;
         }
-        
+
         .memory-meta {
             font-size: 9pt;
             color: #666;
             margin-top: 10px;
             overflow: hidden;
         }
-        
+
         .memory-date {
             float: left;
         }
-        
+
         .memory-type {
             float: right;
             background: var(--primary-color);
@@ -241,12 +332,12 @@
             border-radius: 10px;
             font-size: 8pt;
         }
-        
+
         .tags {
             margin-top: 8px;
             clear: both;
         }
-        
+
         .tag {
             display: inline-block;
             background: var(--tag-bg);
@@ -256,64 +347,106 @@
             font-size: 8pt;
             margin-right: 5px;
         }
-        
+
         /* Стилизация вывода РЕАЛЬНОГО фото */
         .memory-photo-container {
             text-align: center;
             margin: 15px 0;
         }
-        
+
         .memory-photo-fullpage img {
             max-width: 100%;
             max-height: 400px;
             border-radius: var(--photo-border-radius);
             object-fit: contain;
         }
-        
+
         /* Chapter text formatting */
         .chapter-story {
             font-size: 12pt;
             line-height: 1.8;
             text-align: justify;
         }
-        
+
         .chapter-story p {
-            margin-bottom: 12px;
-            text-indent: 1.5cm; /* Paragraph indent */
+            margin-bottom: 16px;
+            text-indent: 1cm;
+            /* Paragraph indent */
+            text-align: justify;
         }
 
-        .chapter-story h1, .chapter-story h2, .chapter-story h3 {
+        .chapter-story h1,
+        .chapter-story h2,
+        .chapter-story h3 {
             margin-top: 24px;
             margin-bottom: 12px;
             text-align: left;
             text-indent: 0;
         }
-        
-        /* Stats Page */
-        .stats {
+
+        /* End Page / Back Cover */
+        .back-cover {
+            page: end-page;
+            width: 148mm;
+            height: 210mm;
+            box-sizing: border-box;
+            padding: 4cm 2cm 2cm 2cm;
+            background: var(--cover-bg);
+            color: var(--cover-text);
             page-break-before: always;
+            overflow: hidden;
+            position: relative;
             text-align: center;
-            padding: 40px 0;
         }
-        
-        .stats h2 {
-            font-size: 24pt;
+
+        .decorative-divider {
+            font-size: 28pt;
             color: var(--primary-color);
             margin-bottom: 30px;
         }
-        
-        .stat-item {
-            margin: 20px 0;
-            font-size: 14pt;
+
+        .signature-text {
+            font-size: 16pt;
+            line-height: 1.8;
+            font-style: italic;
+            color: var(--cover-text);
+            max-width: 80%;
+            margin: 0 auto;
+            font-family: var(--font-family);
         }
-        
-        .stat-number {
-            font-size: 36pt;
-            color: var(--primary-color);
-            font-weight: bold;
+
+        body.theme-classic .signature-text {
+            font-family: "EB Garamond", "Georgia", serif;
+        }
+
+        .end-decorative {
+            font-size: 20pt;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        .book-footer {
+            position: absolute;
+            bottom: 3cm;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10pt;
+            color: #888;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .book-footer .gen-date {
+            font-size: 8pt;
+            margin-top: 5px;
+            text-transform: none;
+            letter-spacing: 0;
+            color: #999;
         }
     </style>
 </head>
+
 <body class="theme-{{ theme }}">
     <!-- Cover Page -->
     <div class="cover">
@@ -321,63 +454,72 @@
         <h1>{{ story_title }}</h1>
         <div class="subtitle">Ваши лучшие моменты</div>
         <div class="decorative">✨</div>
-        <div class="dates">
-            {{ first_memory_date.strftime('%d.%m.%Y') }} — {{ last_memory_date.strftime('%d.%m.%Y') }}
-        </div>
     </div>
-    
+
     <!-- Table of Contents -->
     <div class="toc">
         <h2>Содержание</h2>
         <ul>
             {% for week_key, week_data in weeks.items() %}
-            <li>
-                <a href="#week-{{ week_key }}">
-                    Неделя от {{ week_data.start_date.strftime('%d.%m.%Y') }}
-                    ({{ week_data.memories|length }} воспоминаний)
+            <li class="toc-item">
+                <a href="#chapter-{{ loop.index }}">
+                    <span class="toc-name">
+                        Глава {{ loop.index }}. {{ week_data.title }}
+                        <span class="toc-subtitle">{{ week_data.start_date.strftime('%d.%m.%Y') }} — {{
+                            week_data.end_date.strftime('%d.%m.%Y') }}</span>
+                    </span>
+                    <span class="toc-dots"></span>
+                    <span class="toc-page"></span>
                 </a>
             </li>
             {% endfor %}
-            <li><a href="#stats">Статистика</a></li>
+            <li class="toc-item">
+                <a href="#end-page">
+                    <span class="toc-name">Послесловие</span>
+                    <span class="toc-dots"></span>
+                    <span class="toc-page"></span>
+                </a>
+            </li>
         </ul>
     </div>
-    
+
     <!-- Chapters by Week -->
     {% for week_key, week_data in weeks.items() %}
-    <div class="chapter" id="week-{{ week_key }}">
+    <div class="chapter" id="chapter-{{ loop.index }}">
         <div class="chapter-header">
-            <h2>Неделя от {{ week_data.start_date.strftime('%d.%m.%Y') }}</h2>
-            <div class="dates">{{ week_data.start_date.strftime('%d.%m.%Y') }} — {{ week_data.end_date.strftime('%d.%m.%Y') }}</div>
+            <div class="chapter-num">Глава {{ loop.index }}</div>
+            <h2>{{ week_data.title }}</h2>
+            <div class="dates">{{ week_data.start_date.strftime('%d.%m.%Y') }} — {{
+                week_data.end_date.strftime('%d.%m.%Y') }}</div>
         </div>
-        
+
         <div class="chapter-story">
             {{ week_data.story_html | safe }}
         </div>
     </div>
     {% endfor %}
-    
-    <!-- Statistics Page -->
-    <div class="stats" id="stats">
-        <h2>📊 Статистика</h2>
-        
-        <div class="stat-item">
-            <div class="stat-number">{{ total_memories }}</div>
-            <div>всего воспоминаний</div>
+
+    <!-- End Page / Back Cover -->
+    <div class="back-cover" id="end-page">
+        <div class="decorative-divider">❦</div>
+
+        {% if signature %}
+        <div class="signature-text">
+            {{ signature }}
         </div>
-        
-        <div class="stat-item">
-            <div class="stat-number">{{ weeks|length }}</div>
-            <div>недель с воспоминаниями</div>
+        {% else %}
+        <div class="signature-text">
+            «Самое прекрасное в воспоминаниях то, что вы можете создавать их каждый день, а хранить — всю жизнь.»
         </div>
-        
-        <div class="stat-item">
-            <div class="stat-number">{{ first_memory_date.strftime('%d.%m.%Y') }}</div>
-            <div>первое воспоминание</div>
-        </div>
-        
-        <div style="margin-top: 40px; font-size: 10pt; color: #999;">
-            Книга сгенерирована {{ generated_at.strftime('%d.%m.%Y в %H:%M') }}
+        {% endif %}
+
+        <div class="end-decorative">✨</div>
+
+        <div class="book-footer">
+            <p>{{ story_title }}</p>
+            <p class="gen-date">Создано {{ generated_at.strftime('%d.%m.%Y') }}</p>
         </div>
     </div>
 </body>
+
 </html>
