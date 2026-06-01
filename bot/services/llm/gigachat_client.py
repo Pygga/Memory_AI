@@ -15,6 +15,9 @@ class GigaChatClient(BaseLLMClient):
         self.base_url = "https://gigachat.devices.sberbank.ru/api/v1"
         self.auth_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
         self.access_token = None
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        self.last_total_tokens = 0
 
     async def _authenticate(self) -> None:
         """Fetch a new access token from GigaChat OAuth."""
@@ -80,6 +83,10 @@ class GigaChatClient(BaseLLMClient):
 
                 response.raise_for_status()
                 data = response.json()
+                usage = data.get("usage", {})
+                self.last_prompt_tokens = usage.get("prompt_tokens", 0)
+                self.last_completion_tokens = usage.get("completion_tokens", 0)
+                self.last_total_tokens = usage.get("total_tokens", 0)
                 return data["choices"][0]["message"]["content"]
         except Exception as e:
             logger.error(f"Error calling GigaChat API: {e}")

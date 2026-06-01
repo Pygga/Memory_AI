@@ -1,6 +1,6 @@
 """Database models."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, Float
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from db.database import Base
@@ -38,6 +38,7 @@ class Story(Base):
 
     user = relationship("User", back_populates="stories")
     memories = relationship("Memory", back_populates="story", cascade="all, delete-orphan")
+    chapters = relationship("Chapter", back_populates="story", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Story(id={self.id}, title='{self.title}', user_id={self.user_id})>"
@@ -80,3 +81,42 @@ class Payment(Base):
 
     def __repr__(self):
         return f"<Payment(id={self.id}, user_id={self.user_id}, amount={self.amount})>"
+
+
+class Chapter(Base):
+    __tablename__ = "chapters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    story_id = Column(Integer, ForeignKey("stories.id"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    chapter_number = Column(Integer, nullable=False)
+    memory_ids = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    story = relationship("Story", back_populates="chapters")
+
+    def __repr__(self):
+        return f"<Chapter(id={self.id}, story_id={self.story_id}, title='{self.title}', number={self.chapter_number})>"
+
+
+class LLMLog(Base):
+    __tablename__ = "llm_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    story_id = Column(Integer, ForeignKey("stories.id"), nullable=True, index=True)
+    provider = Column(String, nullable=False)
+    model_name = Column(String, nullable=False)
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User")
+    story = relationship("Story")
+
+    def __repr__(self):
+        return f"<LLMLog(id={self.id}, user_id={self.user_id}, total_tokens={self.total_tokens}, cost_usd={self.cost_usd})>"

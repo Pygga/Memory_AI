@@ -29,7 +29,7 @@ loguru>=0.7.2
 
 # Testing
 pytest>=7.4.3
-pytest-asyncio>=0.21.1
+pytest-asyncio>=0.23.5
 
 # Image processing for photos in books
 pillow>=10.1.0,<11.0.0
@@ -37,4 +37,7 @@ pillow>=10.1.0,<11.0.0
 # LLM integration
 httpx>=0.25.0
 tenacity>=8.2.0
-markdown>=3.5.0pytest-asyncio==0.23.5
+markdown>=3.5.0
+
+# Distributed task queue
+arq>=0.25.0

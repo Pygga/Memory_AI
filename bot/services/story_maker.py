@@ -13,7 +13,7 @@ def get_llm_client() -> BaseLLMClient:
         return GroqClient()
     return GigaChatClient()
 
-async def generate_chapter_story(memories: List[Memory], week_date_str: str) -> tuple[str, bool]:
+async def generate_chapter_story(memories: List[Memory], week_date_str: str, client: BaseLLMClient = None) -> tuple[str, bool]:
     """
     Generate a cohesive story for a week of memories using an LLM.
     
@@ -30,7 +30,8 @@ async def generate_chapter_story(memories: List[Memory], week_date_str: str) -> 
     if not text_memories:
         return "", False
         
-    client = get_llm_client()
+    if not client:
+        client = get_llm_client()
     
     system_prompt = (
         "Ты профессиональный писатель, который пишет автобиографическую книгу воспоминаний. "

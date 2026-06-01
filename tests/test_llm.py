@@ -146,3 +146,82 @@ async def test_groq_no_api_key():
     client.api_key = None # ensure it's empty even if in env
     with pytest.raises(Exception):
         await client.generate_text("sys", "usr")
+
+
+@pytest.mark.asyncio
+@patch('bot.services.semantic_grouper.get_llm_client')
+async def test_group_memories_semantically_success(mock_get_client, mock_memories):
+    mock_client = AsyncMock()
+    mock_client.generate_text.return_value = (
+        '[\n'
+        '  {\n'
+        '    "title": "Глава про парк",\n'
+        '    "memory_ids": [1]\n'
+        '  },\n'
+        '  {\n'
+        '    "title": "Глава про ужин",\n'
+        '    "memory_ids": [2]\n'
+        '  }\n'
+        ']'
+    )
+    mock_get_client.return_value = mock_client
+    
+    # Assign IDs to mock memories
+    mock_memories[0].id = 1
+    mock_memories[1].id = 2
+    
+    from bot.services.semantic_grouper import group_memories_semantically
+    result = await group_memories_semantically(mock_memories)
+    
+    assert len(result) == 2
+    assert result[0]["title"] == "Глава про парк"
+    assert result[0]["memory_ids"] == [1]
+    assert result[1]["title"] == "Глава про ужин"
+    assert result[1]["memory_ids"] == [2]
+
+
+@pytest.mark.asyncio
+@patch('bot.services.semantic_grouper.get_llm_client')
+async def test_group_memories_semantically_failure(mock_get_client, mock_memories):
+    mock_client = AsyncMock()
+    mock_client.generate_text.side_effect = Exception("LLM connection error")
+    mock_get_client.return_value = mock_client
+    
+    from bot.services.semantic_grouper import group_memories_semantically
+    result = await group_memories_semantically(mock_memories)
+    
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_log_llm_usage():
+    from bot.services.llm_logger import log_llm_usage
+    from db.models import LLMLog
+    
+    mock_session = AsyncMock()
+    mock_user_result = MagicMock()
+    mock_user_result.scalar_one_or_none.return_value = 1
+    mock_session.execute.return_value = mock_user_result
+    
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__.return_value = mock_session
+    
+    await log_llm_usage(
+        user_id_tg=123,
+        story_id=456,
+        provider="groq",
+        model_name="llama-3.3-70b-versatile",
+        prompt_t=1000,
+        completion_t=500,
+        session_factory=mock_session_factory
+    )
+    
+    # Verify session added LLMLog with correct cost
+    assert mock_session.add.call_count == 1
+    added_log = mock_session.add.call_args[0][0]
+    assert isinstance(added_log, LLMLog)
+    assert added_log.provider == "groq"
+    assert added_log.total_tokens == 1500
+    # $0.59 * 1000/1M + $0.79 * 500/1M = 0.00059 + 0.000395 = 0.000985
+    assert abs(added_log.cost_usd - 0.000985) < 1e-9
+    mock_session.commit.assert_called_once()

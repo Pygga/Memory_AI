@@ -33,7 +33,7 @@ async def init_db():
         from sqlalchemy import text
         async with engine.begin() as conn:
             # Import all models to ensure they're registered with Base
-            from db.models import Memory, Story, User  # noqa: F401
+            from db.models import Memory, Story, User, Chapter, LLMLog  # noqa: F401
             
             # Create all tables (this will create stories table automatically)
             await conn.run_sync(Base.metadata.create_all)

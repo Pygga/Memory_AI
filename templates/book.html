@@ -460,13 +460,11 @@
     <div class="toc">
         <h2>Содержание</h2>
         <ul>
-            {% for week_key, week_data in weeks.items() %}
+            {% for chapter in chapters %}
             <li class="toc-item">
                 <a href="#chapter-{{ loop.index }}">
                     <span class="toc-name">
-                        Глава {{ loop.index }}. {{ week_data.title }}
-                        <span class="toc-subtitle">{{ week_data.start_date.strftime('%d.%m.%Y') }} — {{
-                            week_data.end_date.strftime('%d.%m.%Y') }}</span>
+                        Глава {{ loop.index }}. {{ chapter.title }}
                     </span>
                     <span class="toc-dots"></span>
                     <span class="toc-page"></span>
@@ -484,17 +482,15 @@
     </div>
 
     <!-- Chapters by Week -->
-    {% for week_key, week_data in weeks.items() %}
+    {% for chapter in chapters %}
     <div class="chapter" id="chapter-{{ loop.index }}">
         <div class="chapter-header">
             <div class="chapter-num">Глава {{ loop.index }}</div>
-            <h2>{{ week_data.title }}</h2>
-            <div class="dates">{{ week_data.start_date.strftime('%d.%m.%Y') }} — {{
-                week_data.end_date.strftime('%d.%m.%Y') }}</div>
+            <h2>{{ chapter.title }}</h2>
         </div>
 
         <div class="chapter-story">
-            {{ week_data.story_html | safe }}
+            {{ chapter.story_html | safe }}
         </div>
     </div>
     {% endfor %}

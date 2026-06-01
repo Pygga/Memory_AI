@@ -26,7 +26,7 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
         await state.set_state(StoryStates.waiting_for_story_title)
         logger.info(f"User {message.from_user.id} clicked 'New book' button")
 
-    elif text == "📚 Архив книг" or text == "📖 Сгенерировать PDF":
+    elif text in ["📚 Мои книги", "📚 Архив книг", "📖 Сгенерировать PDF"]:
         session_factory = get_session_factory()
         async with session_factory() as session:
             from db.models import User, Story
@@ -53,17 +53,11 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             return
             
         from bot.keyboards.main import get_stories_keyboard
-        if text == "📖 Сгенерировать PDF":
-            await message.answer(
-                "📚 <b>Выберите книгу для генерации PDF:</b>",
-                reply_markup=get_stories_keyboard(stories)
-            )
-        else:
-            await message.answer(
-                "📂 <b>Ваш архив книг:</b>\n"
-                "<i>(выберите книгу для генерации PDF)</i>",
-                reply_markup=get_stories_keyboard(stories)
-            )
+        await message.answer(
+            "📂 <b>Ваши книги:</b>\n"
+            "<i>(выберите книгу для открытия Кабинета управления, редактирования глав и генерации PDF)</i>",
+            reply_markup=get_stories_keyboard(stories)
+        )
         logger.info(f"User {message.from_user.id} wants to select a story")
         
     elif text == "💎 Профиль (Подписка)":
@@ -93,15 +87,17 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
     elif text == "❓ Помощь":
         await message.answer(
             "ℹ️ <b>Как правильно пользоваться ботом:</b>\n\n"
-            "<b>Шаг 1: Начать книгу</b>\n"
-            "Нажмите кнопку «🆕 Начать новую книгу» и задайте название (например: 'Отпуск 2026'). Бот начнет собирать всё в эту книгу.\n\n"
-            "<b>Шаг 2: Наполняйте книгу</b>\n"
-            "Просто отправляйте боту фото, голосовые кружочки или текст. Они будут автоматически сохранены.\n\n"
-            "<b>Шаг 3: Тегируйте (по желанию)</b>\n"
-            "Используйте #теги в тексте (например: #море), чтобы воспоминания было легче находить.\n\n"
-            "<b>Шаг 4: Сгенерируйте PDF!</b>\n"
-            "Когда накопится достаточно моментов, нажмите «📖 Сгенерировать PDF». Бот попросит выбрать нужную книгу из списка, затем дизайн (Классика, Модерн, Бизнес) и сгенерирует для вас красивый PDF-файл.\n\n"
-            "<i>Вы в любой момент можете просмотреть старые записи через меню «📚 Архив книг».</i>",
+            "<b>Шаг 1: Создание книги</b>\n"
+            "Нажмите кнопку «🆕 Начать новую книгу» и задайте название. Бот начнет собирать все новые воспоминания в эту книгу.\n\n"
+            "<b>Шаг 2: Наполнение воспоминаниями</b>\n"
+            "Просто отправляйте боту фото, голосовые или текст. Вы можете редактировать/удалять отдельные воспоминания через команду /list.\n\n"
+            "<b>Шаг 3: Кабинет книги и редактирование глав</b>\n"
+            "Нажмите «📖 Сгенерировать PDF» или «📚 Архив книг» и выберите вашу книгу. Вы попадете в **Кабинет книги**:\n"
+            "• Нажмите <i>«📖 Читать / Редактировать главы»</i> — ИИ разобьет ваши записи на 3–5 смысловых глав с красивыми заголовками.\n"
+            "• Выберите главу, чтобы прочитать её. Вы можете нажать <i>«✏️ Изменить текст»</i> и отправить новые правки или нажать <i>«🔄 Перегенерировать ИИ»</i>, чтобы ИИ переписал главу заново.\n"
+            "• Нажмите <i>«🔄 Пересобрать книгу заново»</i>, если хотите полностью изменить структуру и сбросить правки.\n\n"
+            "<b>Шаг 4: Скачивание PDF</b>\n"
+            "В Кабинете книги нажмите <i>«🖨️ Сгенерировать PDF-книгу»</i>, выберите стиль оформления (Классика, Модерн, Бизнес), введите финальную подпись для задней обложки, и бот соберет для вас готовый файл!",
             reply_markup=get_main_keyboard()
         )
         logger.info(f"User {message.from_user.id} clicked 'Help' button")
@@ -219,8 +215,70 @@ async def handle_text_message(message: Message, state: FSMContext) -> None:
     await message.answer(response)
     logger.info(f"Saved text memory from user {user_id_tg} with tags: {tags}")
 
+async def handle_chapter_edit_input(message: Message, state: FSMContext) -> None:
+    """Handle text input for manual chapter editing."""
+    new_content = message.text.strip()
+    if not new_content:
+        return
+        
+    state_data = await state.get_data()
+    chapter_id = state_data.get("chapter_id")
+    story_id = state_data.get("story_id")
+    
+    if not chapter_id:
+        await message.answer("❌ Ошибка: не найден идентификатор главы. Пожалуйста, попробуйте сначала.")
+        await state.clear()
+        return
+        
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        from db.models import Chapter
+        from sqlalchemy import update
+        
+        await session.execute(
+            update(Chapter)
+            .where(Chapter.id == chapter_id)
+            .values(content=new_content)
+        )
+        await session.commit()
+        
+    await state.clear()
+    
+    # Reload updated chapter
+    async with session_factory() as session:
+        from db.models import Chapter
+        from sqlalchemy import select
+        result = await session.execute(
+            select(Chapter).where(Chapter.id == chapter_id)
+        )
+        chapter = result.scalar_one_or_none()
+        
+    if not chapter:
+        await message.answer("❌ Ошибка: глава не найдена после обновления.")
+        return
+        
+    from bot.handlers.callbacks import md_to_telegram_html
+    from bot.keyboards.main import get_chapter_editor_keyboard
+    
+    escaped_content = md_to_telegram_html(chapter.content)
+    text_to_send = (
+        f"✅ <b>Глава {chapter.chapter_number} успешно сохранена!</b>\n\n"
+        f"📖 <b>Глава {chapter.chapter_number}. {chapter.title}</b>\n\n"
+        f"{escaped_content}"
+    )
+    if len(text_to_send) > 4000:
+        text_to_send = text_to_send[:3950] + "\n\n<i>[Текст сокращен из-за лимитов Telegram...]</i>"
+        
+    await message.answer(
+        text_to_send,
+        reply_markup=get_chapter_editor_keyboard(chapter.id, chapter.story_id)
+    )
+
 def register_text_handlers(dp: Dispatcher) -> None:
     """Register text message handlers."""
+    # FSM state handler for manual chapter editing
+    dp.message.register(handle_chapter_edit_input, StoryStates.waiting_for_chapter_edit)
+
     # FSM state handler for custom signature
     dp.message.register(handle_signature_input, StoryStates.waiting_for_signature)
     
@@ -230,7 +288,7 @@ def register_text_handlers(dp: Dispatcher) -> None:
     # Register menu button handler first (higher priority)
     dp.message.register(
         handle_menu_button,
-        F.text.in_(["🆕 Начать новую книгу", "📖 Сгенерировать PDF", "📚 Архив книг", "💎 Профиль (Подписка)", "❓ Помощь"])
+        F.text.in_(["🆕 Начать новую книгу", "📚 Мои книги", "📖 Сгенерировать PDF", "📚 Архив книг", "💎 Профиль (Подписка)", "❓ Помощь"])
     )
     # Then register regular text handler
     dp.message.register(handle_text_message, F.text & ~F.text.startswith('/'))

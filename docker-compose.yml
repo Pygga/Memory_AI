@@ -49,5 +49,26 @@ services:
       - ./static:/app/static
     restart: unless-stopped
 
+  worker:
+    build: .
+    container_name: memory_book_worker
+    command: arq bot.services.queue.worker.WorkerSettings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DATABASE_URL: postgresql+asyncpg://user:password@db:5432/memory_book
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+    volumes:
+      - ./logs:/app/logs
+      - ./static:/app/static
+    restart: unless-stopped
+
 volumes:
   postgres_data:

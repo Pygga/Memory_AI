@@ -59,3 +59,61 @@ async def test_generate_book(mock_markdown, mock_css, mock_html, mock_generate_c
         assert mock_generate_chapter.call_count == 2 # 2 weeks in memories list
         mock_html_obj.write_pdf.assert_called_once()
         assert progress_mock.call_count == 2
+
+
+@pytest.mark.asyncio
+@patch('bot.services.semantic_grouper.group_memories_semantically', new_callable=AsyncMock)
+@patch('bot.services.story_maker.generate_chapter_story', new_callable=AsyncMock)
+@patch('bot.services.story_maker.get_llm_client')
+async def test_ensure_chapters_exist(mock_get_client, mock_generate_chapter, mock_group_semantically):
+    mock_client = MagicMock()
+    mock_client.last_prompt_tokens = 100
+    mock_client.last_completion_tokens = 50
+    mock_get_client.return_value = mock_client
+    from bot.services.book_generator import ensure_chapters_exist
+    from db.models import Story, Memory
+    
+    # Mock groups returned by semantic group helper
+    mock_group_semantically.return_value = [
+        {"title": "Глава про кота", "memory_ids": [1]},
+        {"title": "Глава про собаку", "memory_ids": [2]}
+    ]
+    mock_generate_chapter.return_value = ("Markdown story content", False)
+    
+    mock_session = AsyncMock()
+    mock_story_obj = MagicMock()
+    mock_story_obj.chapters = [] # No chapters yet
+    
+    mock_story_result = MagicMock()
+    mock_story_result.scalar_one_or_none.return_value = mock_story_obj
+    
+    mock_user_result = MagicMock()
+    mock_user_result.scalar_one_or_none.return_value = 1
+    
+    mock_memories = [
+        Memory(id=1, content="Кот спал", created_at=datetime.datetime(2023, 10, 1), memory_type="text"),
+        Memory(id=2, content="Пес бегал", created_at=datetime.datetime(2023, 10, 2), memory_type="text")
+    ]
+    
+    mock_memory_result = MagicMock()
+    mock_memory_result.scalars().all.return_value = mock_memories
+    
+    # Mock executing queries
+    mock_session.execute.side_effect = [mock_story_result, mock_user_result, mock_memory_result]
+    
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__.return_value = mock_session
+    
+    has_fallback = await ensure_chapters_exist(
+        story_id=456,
+        user_id_tg=123,
+        session_factory=mock_session_factory
+    )
+    
+    assert has_fallback is False
+    assert mock_group_semantically.call_count == 1
+    assert mock_generate_chapter.call_count == 2
+    
+    # Verify session added two chapters
+    assert mock_session.add.call_count == 2
+    mock_session.commit.assert_called_once()

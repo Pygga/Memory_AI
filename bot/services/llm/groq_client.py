@@ -12,6 +12,9 @@ class GroqClient(BaseLLMClient):
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("GROQ_API_KEY") 
         self.base_url = "https://api.groq.com/openai/v1"
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        self.last_total_tokens = 0
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def generate_text(
@@ -56,6 +59,10 @@ class GroqClient(BaseLLMClient):
                     logger.error(f"Groq API Error body: {e.response.text}")
                     raise
                 data = response.json()
+                usage = data.get("usage", {})
+                self.last_prompt_tokens = usage.get("prompt_tokens", 0)
+                self.last_completion_tokens = usage.get("completion_tokens", 0)
+                self.last_total_tokens = usage.get("total_tokens", 0)
                 return data["choices"][0]["message"]["content"]
         except Exception as e:
             logger.error(f"Error calling Groq API: {e}")

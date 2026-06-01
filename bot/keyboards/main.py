@@ -8,13 +8,10 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [
                 KeyboardButton(text="🆕 Начать новую книгу"),
-                KeyboardButton(text="📖 Сгенерировать PDF")
+                KeyboardButton(text="📚 Мои книги")
             ],
             [
-                KeyboardButton(text="📚 Архив книг"),
-                KeyboardButton(text="💎 Профиль (Подписка)")
-            ],
-            [
+                KeyboardButton(text="💎 Профиль (Подписка)"),
                 KeyboardButton(text="❓ Помощь")
             ]
         ],
@@ -138,6 +135,52 @@ def get_skip_signature_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="❌ Отмена", callback_data="back")
+            ]
+        ]
+    )
+    return keyboard
+
+def get_story_actions_keyboard(story_id: int) -> InlineKeyboardMarkup:
+    """Create inline keyboard for book (story) actions cabinet."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📖 Читать / Редактировать главы", callback_data=f"manage_chaps_{story_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🖨️ Сгенерировать PDF-книгу", callback_data=f"select_theme_{story_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Пересобрать книгу заново", callback_data=f"rebuild_story_{story_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 К списку книг", callback_data="menu_book")
+            ]
+        ]
+    )
+    return keyboard
+
+def get_chapters_list_keyboard(chapters: list, story_id: int) -> InlineKeyboardMarkup:
+    """Create inline keyboard for list of chapters."""
+    buttons = []
+    for chapter in chapters:
+        buttons.append([InlineKeyboardButton(
+            text=f"Глава {chapter.chapter_number}. {chapter.title}",
+            callback_data=f"view_chap_{chapter.id}"
+        )])
+    buttons.append([InlineKeyboardButton(text="🔙 В меню книги", callback_data=f"select_story_{story_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_chapter_editor_keyboard(chapter_id: int, story_id: int) -> InlineKeyboardMarkup:
+    """Create inline keyboard for editing a specific chapter."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✏️ Изменить текст", callback_data=f"edit_chap_{chapter_id}"),
+                InlineKeyboardButton(text="🔄 Перегенерировать ИИ", callback_data=f"regen_chap_{chapter_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 К списку глав", callback_data=f"manage_chaps_{story_id}")
             ]
         ]
     )
