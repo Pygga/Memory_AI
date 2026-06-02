@@ -1,6 +1,5 @@
-from db.models import User, LLMLog
-from sqlalchemy import select
 from loguru import logger
+from db.repositories import UserRepository, LLMLogRepository
 
 async def log_llm_usage(user_id_tg: int, story_id: int, provider: str, model_name: str, prompt_t: int, completion_t: int, session_factory) -> None:
     """Calculates expenses in USD on AI tokens and writes to DB."""
@@ -13,25 +12,22 @@ async def log_llm_usage(user_id_tg: int, story_id: int, provider: str, model_nam
 
     try:
         async with session_factory() as session:
-            result = await session.execute(
-                select(User.id).where(User.telegram_id == user_id_tg)
-            )
-            user_record = result.scalar_one_or_none()
+            user_repo = UserRepository(session)
+            user_record = await user_repo.get_by_telegram_id(user_id_tg)
             if not user_record:
                 logger.warning(f"Could not find user in database for telegram_id: {user_id_tg}")
                 return
 
-            log = LLMLog(
-                user_id=user_record,
+            llm_log_repo = LLMLogRepository(session)
+            await llm_log_repo.create(
+                user_id=user_record.id,
                 story_id=story_id,
                 provider=provider,
                 model_name=model_name,
                 prompt_tokens=prompt_t,
                 completion_tokens=completion_t,
-                total_tokens=prompt_t + completion_t,
                 cost_usd=cost
             )
-            session.add(log)
             await session.commit()
             logger.info(f"📊 LLM expense logged for user {user_id_tg}: {prompt_t+completion_t} tokens, cost: ${cost:.6f}")
     except Exception as e:

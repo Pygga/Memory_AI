@@ -1,4 +1,3 @@
-```
 # Python
 __pycache__/
 *.pyc
@@ -15,6 +14,11 @@ env/
 
 # Logs
 *.log
+logs/
+
+# User Uploads & Generated Books
+static/uploads/
+static/books/
 
 # Editor
 .vscode/
@@ -30,4 +34,3 @@ build/
 htmlcov/
 .mypy_cache/
 .pytest_cache/
-```

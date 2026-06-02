@@ -21,10 +21,11 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 
 # Копируем зависимости первыми (для кэширования)
-COPY requirements.txt .
+COPY pyproject.toml uv.lock ./
 
-# Устанавливаем Python-пакеты
-RUN pip install --no-cache-dir -r requirements.txt
+# Устанавливаем uv и зависимости
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache -r pyproject.toml
 
 # Копируем код
 COPY . .

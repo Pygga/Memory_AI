@@ -4,6 +4,7 @@ from aiogram import Dispatcher, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from loguru import logger
+from bot.config import settings
 from bot.keyboards.main import get_back_keyboard, get_help_keyboard, get_main_menu_inline_keyboard
 from bot.states import StoryStates
 
@@ -92,18 +93,15 @@ async def handle_callback_menu_add(callback: CallbackQuery) -> None:
 
 async def handle_callback_menu_list(callback: CallbackQuery) -> None:
     """Handle menu list callback."""
-    from sqlalchemy import select
     from db.database import get_session_factory
-    from db.models import User, Memory
+    from db.repositories import UserRepository, MemoryRepository
     
     user_id_tg = callback.from_user.id
     session_factory = get_session_factory()
     
     async with session_factory() as session:
-        result = await session.execute(
-            select(User.id).where(User.telegram_id == user_id_tg)
-        )
-        user_record = result.scalar_one_or_none()
+        user_repo = UserRepository(session)
+        user_record = await user_repo.get_by_telegram_id(user_id_tg)
         
         if not user_record:
             await callback.message.edit_text(
@@ -113,13 +111,8 @@ async def handle_callback_menu_list(callback: CallbackQuery) -> None:
             await callback.answer()
             return
         
-        result = await session.execute(
-            select(Memory)
-            .where(Memory.user_id == user_record)
-            .order_by(Memory.created_at.desc())
-            .limit(10)
-        )
-        memories = result.scalars().all()
+        memory_repo = MemoryRepository(session)
+        memories = await memory_repo.get_latest_by_user(user_record.id, limit=10)
     
     if not memories:
         await callback.message.edit_text(
@@ -146,27 +139,20 @@ async def handle_callback_menu_list(callback: CallbackQuery) -> None:
 async def handle_callback_menu_book(callback: CallbackQuery) -> None:
     """Handle menu book callback - show stories list first."""
     from db.database import get_session_factory
+    from db.repositories import UserRepository, StoryRepository
+    
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.models import User, Story
-        from sqlalchemy import select
-        
-        result = await session.execute(
-            select(User.id).where(User.telegram_id == callback.from_user.id)
-        )
-        user_record = result.scalar_one_or_none()
+        user_repo = UserRepository(session)
+        user_record = await user_repo.get_by_telegram_id(callback.from_user.id)
         
         if not user_record:
             await callback.message.edit_text("Пожалуйста, сначала запустите бота командой /start")
             await callback.answer()
             return
             
-        result = await session.execute(
-            select(Story)
-            .where(Story.user_id == user_record)
-            .order_by(Story.created_at.desc())
-        )
-        stories = result.scalars().all()
+        story_repo = StoryRepository(session)
+        stories = await story_repo.get_all_by_user_id(user_record.id)
         
     if not stories:
         await callback.message.edit_text("У вас пока нет историй. Сначала создайте историю и добавьте воспоминания!", reply_markup=get_back_keyboard())
@@ -185,19 +171,13 @@ async def handle_select_story(callback: CallbackQuery) -> None:
     """Handle story selection - show Book Cabinet (story actions)."""
     story_id = int(callback.data.replace("select_story_", ""))
     from db.database import get_session_factory
-    from db.models import Story
-    from sqlalchemy import select
-    from sqlalchemy.orm import selectinload
+    from db.repositories import StoryRepository
     from bot.keyboards.main import get_story_actions_keyboard
     
     session_factory = get_session_factory()
     async with session_factory() as session:
-        result = await session.execute(
-            select(Story)
-            .where(Story.id == story_id)
-            .options(selectinload(Story.chapters))
-        )
-        story = result.scalar_one_or_none()
+        story_repo = StoryRepository(session)
+        story = await story_repo.get_by_id(story_id, load_chapters=True)
         
     if not story:
         await callback.answer("Книга не найдена", show_alert=True)
@@ -228,7 +208,7 @@ async def start_book_generation(message: Message, user_tg_id: int, story_id: int
         from arq import create_pool
         from arq.connections import RedisSettings
         
-        redis_settings = RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+        redis_settings = RedisSettings.from_dsn(settings.redis_url)
         arq_pool = await create_pool(redis_settings)
         
         # Enqueue the background task
@@ -572,7 +552,7 @@ async def handle_trigger_regenerate_chapter(callback: CallbackQuery) -> None:
         
         # Log LLM usage
         if not is_fallback:
-            provider = os.getenv("LLM_PROVIDER", "gigachat").lower()
+            provider = settings.llm_provider.lower()
             model_name = "llama-3.3-70b-versatile" if provider == "groq" else "GigaChat"
             from bot.services.llm_logger import log_llm_usage
             await log_llm_usage(

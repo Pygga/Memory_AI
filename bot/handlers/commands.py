@@ -5,8 +5,7 @@ from aiogram.types import Message
 from loguru import logger
 
 from db.database import get_session_factory
-from db.models import Memory, User
-from sqlalchemy import select
+from db.repositories import UserRepository, MemoryRepository, StoryRepository
 from bot.keyboards.main import get_main_keyboard, get_help_keyboard
 
 
@@ -15,9 +14,8 @@ async def cmd_start(message: Message) -> None:
     # Ensure user exists in DB
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.users import get_or_create_user
-        await get_or_create_user(
-            session,
+        user_repo = UserRepository(session)
+        await user_repo.get_or_create(
             telegram_id=message.from_user.id,
             username=message.from_user.username,
             first_name=message.from_user.first_name,
@@ -30,7 +28,7 @@ async def cmd_start(message: Message) -> None:
         "Я — ваш личный архивариус воспоминаний. Я помогу вам сохранить памятные моменты и превратить их в красивую книгу с помощью искусственного интеллекта.\n\n"
         "⚡️ <b>Наши ИИ-возможности:</b>\n"
         "• <b>Умные ИИ-главы</b>: Бот автоматически группирует воспоминания по смыслу и темам в 3–5 глав с красивыми названиями вместо сухой разбивки по неделям.\n"
-        "• <b>Интерактивный редактор</b>: Вы можете читать главы прямо в Telegram, редактировать их вручную или переписывать одной кнопкой через ИИ в <i>Кабинете книги</i>.\n"
+        "• <b>Интерактивный редактор</b>: Вы можете читать главы прямо в Telegram, редактировать их вручную или перегенерировать одной кнопкой через ИИ в <i>Кабинете книги</i>.\n"
         "• <b>Красивый PDF-макет</b>: Поддержка изысканных шрифтов, книжных стандартов верстки, скругления фото и вашей финальной подписи.\n\n"
         "<b>Ваш план действий:</b>\n"
         "1️⃣ Нажмите <b>«🆕 Начать новую книгу»</b> и введите название (например, 'Отпуск' или 'Дневник 2026').\n"
@@ -81,24 +79,15 @@ async def cmd_list(message: Message) -> None:
     session_factory = get_session_factory()
     
     async with session_factory() as session:
-        # First get internal user.id by telegram_id
-        result = await session.execute(
-            select(User.id).where(User.telegram_id == user_id_tg)
-        )
-        user_record = result.scalar_one_or_none()
+        user_repo = UserRepository(session)
+        user_record = await user_repo.get_by_telegram_id(user_id_tg)
         
         if not user_record:
             await message.answer("📭 У вас пока нет сохранённых воспоминаний.")
             return
         
-        # Now fetch memories by internal user.id
-        result = await session.execute(
-            select(Memory)
-            .where(Memory.user_id == user_record)
-            .order_by(Memory.created_at.desc())
-            .limit(10)
-        )
-        memories = result.scalars().all()
+        memory_repo = MemoryRepository(session)
+        memories = await memory_repo.get_latest_by_user(user_record.id, limit=10)
     
     if not memories:
         await message.answer(
@@ -124,24 +113,15 @@ async def cmd_book(message: Message) -> None:
     """Handle /book command - show stories selection."""
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.models import User, Story
-        from sqlalchemy import select
-        
-        result = await session.execute(
-            select(User.id).where(User.telegram_id == message.from_user.id)
-        )
-        user_record = result.scalar_one_or_none()
+        user_repo = UserRepository(session)
+        user_record = await user_repo.get_by_telegram_id(message.from_user.id)
         
         if not user_record:
             await message.answer("Пожалуйста, сначала запустите бота командой /start")
             return
             
-        result = await session.execute(
-            select(Story)
-            .where(Story.user_id == user_record)
-            .order_by(Story.created_at.desc())
-        )
-        stories = result.scalars().all()
+        story_repo = StoryRepository(session)
+        stories = await story_repo.get_all_by_user_id(user_record.id)
         
     if not stories:
         await message.answer("У вас пока нет историй. Сначала создайте историю и добавьте воспоминания!")

@@ -1,133 +1,121 @@
-# Memory Book Bot
+# 📖 Memory AI Bot
 
-Telegram bot for creating personal memory books from your daily messages, voice notes, and photos.
+Telegram-бот для создания персональных книг воспоминаний из ваших ежедневных сообщений, голосовых заметок и фотографий с помощью искусственного интеллекта.
 
-## Project Structure
+---
+
+## ✨ Основные возможности
+
+- **✍️ Умная автобиография**: Отправляйте боту текстовые заметки, фотографии с описанием или голосовые сообщения.
+- **🎤 Транскрипция аудио**: Голосовые сообщения автоматически преобразуются в текст с помощью `faster-whisper`.
+- **🏷️ Поддержка тегов**: Пометка записей хештегами (например, `#путешествие #семья`) для автоматической каталогизации.
+- **🧠 Семантическое ИИ-группирование**: Бот автоматически анализирует ваши воспоминания и разбивает их на 3–5 логических и последовательных глав с поэтичными названиями вместо простого деления по датам.
+- **🗂️ Кабинет книги**: Читайте и редактируйте главы прямо в Telegram-интерфейсе, перегенерируйте их через ИИ или пересобирайте структуру книги с нуля.
+- **🖨️ Книжная PDF-верстка**: Генерация готовой к печати книги через `WeasyPrint` с поддержкой стилей (Классика, Модерн, Бизнес) и кастомной финальной подписи.
+- **⏳ Фоновая генерация**: Сборка PDF выполняется асинхронно в очереди задач на базе `arq` и `Redis`, не замедляя работу бота.
+
+---
+
+## 🛠️ Архитектура проекта
 
 ```
-memory-book-bot/
-├── bot/                    # Bot logic and handlers
-│   ├── __init__.py
-│   ├── main.py            # Entry point
-│   ├── handlers/          # Message handlers
-│   │   ├── __init__.py
-│   │   ├── text.py
-│   │   ├── voice.py
-│   │   └── photo.py
-│   ├── services/          # Business logic
-│   │   ├── __init__.py
-│   │   ├── transcription.py
-│   │   └── book_generator.py
-│   └── keyboards/         # Inline keyboards
-│       └── __init__.py
-├── db/                     # Database models and connection
-│   ├── __init__.py
-│   ├── database.py
-│   └── models.py
-├── migrations/             # Alembic migrations
-├── templates/              # Jinja2 templates for PDF
-│   └── book.html
-├── static/                 # Static files
-│   ├── css/
-│   │   └── book.css
-│   └── fonts/
-├── tests/                  # Unit tests
-├── logs/                   # Log files
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-├── .env.example
-└── README.md
+Memory_AI/
+├── bot/                      # Логика Telegram-бота
+│   ├── main.py               # Точка входа для запуска бота
+│   ├── config.py             # Настройки проекта на Pydantic Settings
+│   ├── states.py             # Состояния конечного автомата (FSM)
+│   ├── handlers/             # Обработчики сообщений и коллбэков
+│   │   ├── commands.py       # Команды (/start, /help, /list)
+│   │   ├── callbacks.py      # Коллбэки инлайн-клавиатур (Кабинет книги)
+│   │   ├── text.py           # Обработка текстовых воспоминаний
+│   │   ├── voice.py          # Транскрипция и сохранение голосовых заметок
+│   │   ├── photo.py          # Сохранение фотографий
+│   │   └── errors.py         # Глобальный обработчик ошибок Telegram API
+│   ├── keyboards/            # Генерация инлайн и реплай клавиатур
+│   └── services/             # Бизнес-логика приложения
+│       ├── book_generator.py # Валидация контента и верстка PDF книги
+│       ├── story_maker.py    # Написание текстов глав через ИИ
+│       ├── semantic_grouper.py# Семантическая группировка воспоминаний через ИИ
+│       ├── llm_logger.py     # Логирование и расчет стоимости ИИ-токенов
+│       ├── queue/            # Фоновые задачи
+│       │   └── worker.py     # arq worker для асинхронной сборки книг
+│       └── llm/              # Асинхронные ИИ-клиенты
+│           ├── base.py       # Базовый абстрактный класс
+│           ├── gigachat_client.py # Клиент Sber GigaChat API
+│           └── groq_client.py     # Клиент Groq API (Llama-3.3)
+├── db/                       # Работа с базой данных
+│   ├── database.py           # Настройка подключения (SQLAlchemy Async)
+│   └── models.py             # Описание моделей (SQLAlchemy 2.0 с Mapped)
+│   └── repositories.py       # Слой Репозиториев (Repository Pattern)
+├── templates/                # Jinja2 HTML-шаблоны для PDF
+├── static/                   # Статические файлы (шрифты, загрузки, CSS)
+├── tests/                    # Юнит-тесты (pytest)
+├── Dockerfile                # Инструкция сборки контейнеров на базе uv
+├── docker-compose.yml        # Оркестрация сервисов (Bot, Worker, DB, Redis)
+├── pyproject.toml            # Описание зависимостей и метаданные проекта (uv)
+└── uv.lock                   # Lock-файл для воспроизводимости зависимостей
 ```
 
-## Features
+---
 
-- 📝 Text messages with hashtag support
-- 🎤 Voice message transcription via Whisper.cpp
-- 📷 Photo storage and inclusion in books
-- 📚 PDF book generation with beautiful design
-- 🏷️ Tag-based organization
-- 📅 Chapter organization by weeks/months
+## 🚀 Быстрый старт
 
-## Quick Start
+### Требования
+- Установленный **Docker** и **Docker Compose**
+- Токен Telegram-бота (полученный у [@BotFather](https://t.me/BotFather))
+- Ключи доступа к ИИ (GigaChat Auth Key или Groq API Key)
 
-### Prerequisites
+### Установка и запуск
 
-- Docker and Docker Compose
-- Telegram Bot Token (from @BotFather)
+1. Склонируйте репозиторий:
+   ```bash
+   git clone <repository-url>
+   cd Memory_AI
+   ```
 
-### Installation
+2. Создайте файл конфигурации окружения `.env`:
+   ```bash
+   cp .env.example .env
+   ```
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd memory-book-bot
-```
+3. Заполните переменные в `.env`:
+   ```env
+   TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+   
+   # Выбор ИИ-провайдера: "gigachat" или "groq"
+   LLM_PROVIDER=groq
+   
+   # API Ключи (заполните нужный в зависимости от выбранного LLM_PROVIDER)
+   GIGACHAT_AUTH_KEY=your_gigachat_auth_key
+   GROQ_API_KEY=your_groq_api_key
+   
+   # Настройки инфраструктуры (в docker-compose настроены по умолчанию)
+   DATABASE_URL=postgresql+asyncpg://user:password@db:5432/memory_book
+   REDIS_URL=redis://redis:6379/0
+   ```
 
-2. Copy environment file:
-```bash
-cp .env.example .env
-```
+4. Запустите стек контейнеров:
+   ```bash
+   docker-compose up --build
+   ```
 
-3. Edit `.env` and add your Telegram bot token:
-```
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-DATABASE_URL=postgresql://user:password@db:5432/memory_book
-REDIS_URL=redis://redis:6379/0
-```
+---
 
-4. Start the services:
-```bash
-docker-compose up --build
-```
+## 🧪 Разработка и тестирование
 
-### Usage
+Проект использует менеджер зависимостей [uv](https://github.com/astral-sh/uv). Для локальной разработки без Docker:
 
-1. Start a chat with your bot on Telegram
-2. Use `/start` to begin
-3. Send text messages, voice notes, or photos
-4. Use `#tags` to organize your memories
-5. Generate your book with `/book`
+1. Установите зависимости и создайте виртуальное окружение:
+   ```bash
+   uv sync
+   ```
 
-### Commands
+2. Запустите автоматические тесты:
+   ```bash
+   uv run pytest
+   ```
 
-- `/start` - Start the bot
-- `/help` - Show help information
-- `/add` - Add a memory manually
-- `/list` - List your memories
-- `/book` - Generate PDF book
+---
 
-## Development
-
-### Running tests
-
-```bash
-docker-compose exec bot pytest tests/
-```
-
-### Database migrations
-
-```bash
-docker-compose exec bot alembic upgrade head
-```
-
-## Deployment on Render
-
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Set environment variables
-4. Deploy!
-
-## Tech Stack
-
-- **Backend**: Python 3.11+
-- **Bot Framework**: aiogram 3.x
-- **Database**: PostgreSQL
-- **Cache**: Redis
-- **PDF Generation**: WeasyPrint
-- **Transcription**: Whisper.cpp
-- **Templates**: Jinja2
-
-## License
-
-MIT
+## 📖 Инструкции и отчет
+Подробное описание процесса проектирования, примененных решений, структуры СУБД, механизмов PDF-рендеринга и работы с LLM-моделями читайте в файле [PROJECT_REPORT.md](file:///Users/viktorevgrafov/Projects/Memory_AI/PROJECT_REPORT.md).

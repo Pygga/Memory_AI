@@ -1,10 +1,9 @@
 """Text message handlers."""
 from aiogram import Dispatcher, F
-from aiogram.types import Message, FSInputFile  # ✅ Добавлен FSInputFile
+from aiogram.types import Message
 from loguru import logger
 from db.database import get_session_factory
-from db.models import Memory
-from db.users import get_or_create_user
+from db.repositories import UserRepository, StoryRepository, MemoryRepository, ChapterRepository
 from utils.helpers import extract_tags
 from bot.keyboards.main import get_main_keyboard, get_back_keyboard
 
@@ -29,24 +28,15 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
     elif text in ["📚 Мои книги", "📚 Архив книг", "📖 Сгенерировать PDF"]:
         session_factory = get_session_factory()
         async with session_factory() as session:
-            from db.models import User, Story
-            from sqlalchemy import select
-            
-            result = await session.execute(
-                select(User.id).where(User.telegram_id == message.from_user.id)
-            )
-            user_record = result.scalar_one_or_none()
+            user_repo = UserRepository(session)
+            user_record = await user_repo.get_by_telegram_id(message.from_user.id)
             
             if not user_record:
                 await message.answer("Пожалуйста, сначала запустите бота командой /start")
                 return
                 
-            result = await session.execute(
-                select(Story)
-                .where(Story.user_id == user_record)
-                .order_by(Story.created_at.desc())
-            )
-            stories = result.scalars().all()
+            story_repo = StoryRepository(session)
+            stories = await story_repo.get_all_by_user_id(user_record.id)
             
         if not stories:
             await message.answer("У вас пока нет книг. Сначала создайте новую!")
@@ -64,10 +54,8 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
         user_id_tg = message.from_user.id
         session_factory = get_session_factory()
         async with session_factory() as session:
-            from db.models import User
-            from sqlalchemy import select
-            result = await session.execute(select(User).where(User.telegram_id == user_id_tg))
-            user_record = result.scalar_one_or_none()
+            user_repo = UserRepository(session)
+            user_record = await user_repo.get_by_telegram_id(user_id_tg)
             
         if user_record:
             tier = "👑 Premium" if user_record.subscription_tier == "premium" else "🆓 Бесплатный"
@@ -112,29 +100,20 @@ async def handle_story_title_input(message: Message, state: FSMContext) -> None:
     session_factory = get_session_factory()
     
     async with session_factory() as session:
-        from db.models import User, Story
-        from sqlalchemy import select, update
-        
-        user = await get_or_create_user(
-            session,
+        user_repo = UserRepository(session)
+        user = await user_repo.get_or_create(
             telegram_id=user_id_tg,
             username=message.from_user.username,
             first_name=message.from_user.first_name,
             last_name=message.from_user.last_name
         )
         
+        story_repo = StoryRepository(session)
         # Deactivate all existing stories
-        await session.execute(
-            update(Story).where(Story.user_id == user.id).values(is_active=0)
-        )
+        await story_repo.deactivate_all_for_user(user.id)
         
         # Create new story
-        new_story = Story(
-            user_id=user.id,
-            title=title,
-            is_active=1
-        )
-        session.add(new_story)
+        await story_repo.create(user_id=user.id, title=title, is_active=1)
         await session.commit()
         
     await state.clear()
@@ -176,12 +155,8 @@ async def handle_text_message(message: Message, state: FSMContext) -> None:
     # Save to database
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.models import User, Story
-        from sqlalchemy import select
-        
-        # Get or create user (returns User with .id)
-        user = await get_or_create_user(
-            session,
+        user_repo = UserRepository(session)
+        user = await user_repo.get_or_create(
             telegram_id=user_id_tg,
             username=message.from_user.username,
             first_name=message.from_user.first_name,
@@ -189,13 +164,12 @@ async def handle_text_message(message: Message, state: FSMContext) -> None:
         )
         
         # Get active story
-        result = await session.execute(
-            select(Story).where(Story.user_id == user.id, Story.is_active == 1)
-        )
-        active_story = result.scalar_one_or_none()
+        story_repo = StoryRepository(session)
+        active_story = await story_repo.get_active_by_user_id(user.id)
         
         # Create memory with INTERNAL user.id and active story_id
-        memory = Memory(
+        memory_repo = MemoryRepository(session)
+        await memory_repo.create(
             user_id=user.id,
             story_id=active_story.id if active_story else None,
             content=text,
@@ -203,7 +177,6 @@ async def handle_text_message(message: Message, state: FSMContext) -> None:
             tags=tags,
             file_id=None
         )
-        session.add(memory)
         await session.commit()
     
     # Send confirmation
@@ -232,26 +205,16 @@ async def handle_chapter_edit_input(message: Message, state: FSMContext) -> None
         
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.models import Chapter
-        from sqlalchemy import update
-        
-        await session.execute(
-            update(Chapter)
-            .where(Chapter.id == chapter_id)
-            .values(content=new_content)
-        )
+        chapter_repo = ChapterRepository(session)
+        await chapter_repo.update_content(chapter_id, new_content)
         await session.commit()
         
     await state.clear()
     
     # Reload updated chapter
     async with session_factory() as session:
-        from db.models import Chapter
-        from sqlalchemy import select
-        result = await session.execute(
-            select(Chapter).where(Chapter.id == chapter_id)
-        )
-        chapter = result.scalar_one_or_none()
+        chapter_repo = ChapterRepository(session)
+        chapter = await chapter_repo.get_by_id(chapter_id)
         
     if not chapter:
         await message.answer("❌ Ошибка: глава не найдена после обновления.")
@@ -284,11 +247,16 @@ def register_text_handlers(dp: Dispatcher) -> None:
     
     # FSM state handler for new story title
     dp.message.register(handle_story_title_input, StoryStates.waiting_for_story_title)
-    
-    # Register menu button handler first (higher priority)
-    dp.message.register(
-        handle_menu_button,
-        F.text.in_(["🆕 Начать новую книгу", "📚 Мои книги", "📖 Сгенерировать PDF", "📚 Архив книг", "💎 Профиль (Подписка)", "❓ Помощь"])
-    )
-    # Then register regular text handler
-    dp.message.register(handle_text_message, F.text & ~F.text.startswith('/'))
+
+    # Register main menu buttons via text filter
+    dp.message.register(handle_menu_button, F.text.in_([
+        "🆕 Начать новую книгу", 
+        "📚 Мои книги", 
+        "📚 Архив книг", 
+        "📖 Сгенерировать PDF", 
+        "💎 Профиль (Подписка)", 
+        "❓ Помощь"
+    ]))
+
+    # General text message handler
+    dp.message.register(handle_text_message, F.text)

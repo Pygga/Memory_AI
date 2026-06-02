@@ -1,6 +1,6 @@
-import os
 import asyncio
 from arq.connections import RedisSettings
+from bot.config import settings
 from bot.services.book_generator import generate_book
 from db.database import get_session_factory
 from aiogram import Bot
@@ -12,7 +12,7 @@ async def generate_book_task(ctx, user_id_tg: int, story_id: int, theme: str, si
     """Background arq task for rendering PDF book and sending to the user."""
     logger.info(f"Worker picked up PDF task for user {user_id_tg}, story {story_id}")
     
-    bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=settings.telegram_bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     session_factory = get_session_factory()
     
     # Callback to update progress in chat in real-time
@@ -71,6 +71,6 @@ async def generate_book_task(ctx, user_id_tg: int, story_id: int, theme: str, si
 class WorkerSettings:
     """arq worker configuration settings."""
     functions = [generate_book_task]
-    redis_settings = RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+    redis_settings = RedisSettings.from_dsn(settings.redis_url)
     # Concurrency limit: max 2 simultaneous PDF generations
     max_jobs = 2

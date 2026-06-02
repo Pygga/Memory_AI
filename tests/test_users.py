@@ -1,9 +1,9 @@
-"""Tests for db/users.py"""
+"""Tests for UserRepository."""
 import pytest
 from sqlalchemy import select
 
 from db.models import User
-from db.users import get_or_create_user
+from db.repositories import UserRepository
 
 
 @pytest.mark.asyncio
@@ -11,8 +11,8 @@ async def test_create_new_user(db_session):
     """Test creating a new user."""
     telegram_id = 123456789
     
-    user = await get_or_create_user(
-        db_session,
+    user_repo = UserRepository(db_session)
+    user = await user_repo.get_or_create(
         telegram_id=telegram_id,
         username="test_user",
         first_name="Test"
@@ -28,9 +28,9 @@ async def test_get_existing_user(db_session):
     """Test getting existing user (not creating duplicate)."""
     telegram_id = 987654321
     
+    user_repo = UserRepository(db_session)
     # Create user first time
-    user1 = await get_or_create_user(
-        db_session,
+    user1 = await user_repo.get_or_create(
         telegram_id=telegram_id,
         username="first",
         first_name="First"
@@ -38,8 +38,7 @@ async def test_get_existing_user(db_session):
     user1_id = user1.id
     
     # Get same user second time
-    user2 = await get_or_create_user(
-        db_session,
+    user2 = await user_repo.get_or_create(
         telegram_id=telegram_id,
         username="second",  # Different data — should be ignored
         first_name="Second"
@@ -55,8 +54,8 @@ async def test_user_flush_assigns_id(db_session):
     """Test that flush() assigns internal id before commit."""
     telegram_id = 555666777
     
-    user = await get_or_create_user(
-        db_session,
+    user_repo = UserRepository(db_session)
+    user = await user_repo.get_or_create(
         telegram_id=telegram_id,
         username="flush_test"
     )

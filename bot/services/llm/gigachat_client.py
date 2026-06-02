@@ -5,13 +5,14 @@ from typing import Optional
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from bot.config import settings
 from .base import BaseLLMClient
 
 class GigaChatClient(BaseLLMClient):
     """Client for Sber GigaChat API."""
 
     def __init__(self, auth_key: Optional[str] = None):
-        self.auth_key = auth_key or os.getenv("GIGACHAT_AUTH_KEY")
+        self.auth_key = auth_key or settings.gigachat_auth_key
         self.base_url = "https://gigachat.devices.sberbank.ru/api/v1"
         self.auth_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
         self.access_token = None

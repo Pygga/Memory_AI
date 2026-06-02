@@ -196,11 +196,13 @@ async def test_group_memories_semantically_failure(mock_get_client, mock_memorie
 @pytest.mark.asyncio
 async def test_log_llm_usage():
     from bot.services.llm_logger import log_llm_usage
-    from db.models import LLMLog
+    from db.models import LLMLog, User
     
     mock_session = AsyncMock()
     mock_user_result = MagicMock()
-    mock_user_result.scalar_one_or_none.return_value = 1
+    mock_user = MagicMock(spec=User)
+    mock_user.id = 1
+    mock_user_result.scalar_one_or_none.return_value = mock_user
     mock_session.execute.return_value = mock_user_result
     
     mock_session_factory = MagicMock()

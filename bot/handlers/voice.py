@@ -1,17 +1,15 @@
 """Voice message handlers with faster-whisper transcription."""
 import os
 import asyncio
-import re
 from aiogram import Dispatcher, F
 from aiogram.types import Message
 from loguru import logger
 
 from db.database import get_session_factory
-from db.models import Memory
-from db.users import get_or_create_user
+from db.repositories import UserRepository, StoryRepository, MemoryRepository
 from utils.helpers import extract_tags
 from faster_whisper import WhisperModel
-
+from bot.config import settings
 
 # Global whisper model — loaded once at startup
 _whisper_model = None
@@ -24,7 +22,7 @@ async def load_whisper_model():
         loop = asyncio.get_event_loop()
         _whisper_model = await loop.run_in_executor(
             None,
-            lambda: WhisperModel("small", device="cpu", compute_type="int8")
+            lambda: WhisperModel(settings.whisper_model, device="cpu", compute_type="int8")
         )
     return _whisper_model
 
@@ -75,11 +73,8 @@ async def handle_voice_message(message: Message) -> None:
     # Save to DB
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.models import User, Story
-        from sqlalchemy import select
-        
-        user = await get_or_create_user(
-            session,
+        user_repo = UserRepository(session)
+        user = await user_repo.get_or_create(
             telegram_id=user_id_tg,
             username=message.from_user.username,
             first_name=message.from_user.first_name,
@@ -87,13 +82,12 @@ async def handle_voice_message(message: Message) -> None:
         )
         
         # Get active story
-        result = await session.execute(
-            select(Story).where(Story.user_id == user.id, Story.is_active == 1)
-        )
-        active_story = result.scalar_one_or_none()
+        story_repo = StoryRepository(session)
+        active_story = await story_repo.get_active_by_user_id(user.id)
         
-        # Create memory with INTERNAL user.id
-        memory = Memory(
+        # Create memory with INTERNAL user.id via repository
+        memory_repo = MemoryRepository(session)
+        await memory_repo.create(
             user_id=user.id,
             story_id=active_story.id if active_story else None,
             content=transcribed_text,
@@ -101,7 +95,6 @@ async def handle_voice_message(message: Message) -> None:
             tags=tags,
             file_id=file.file_id
         )
-        session.add(memory)
         await session.commit()
     
     # Cleanup temp file

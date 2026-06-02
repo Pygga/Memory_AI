@@ -5,8 +5,7 @@ from aiogram.types import Message
 from loguru import logger
 
 from db.database import get_session_factory
-from db.models import Memory
-from db.users import get_or_create_user
+from db.repositories import UserRepository, StoryRepository, MemoryRepository
 from utils.helpers import extract_tags
 
 
@@ -33,12 +32,8 @@ async def handle_photo_message(message: Message) -> None:
     # Save to database
     session_factory = get_session_factory()
     async with session_factory() as session:
-        from db.models import User, Story
-        from sqlalchemy import select
-        
-        # Get or create user
-        user = await get_or_create_user(
-            session,
+        user_repo = UserRepository(session)
+        user = await user_repo.get_or_create(
             telegram_id=user_id_tg,
             username=message.from_user.username,
             first_name=message.from_user.first_name,
@@ -46,13 +41,12 @@ async def handle_photo_message(message: Message) -> None:
         )
         
         # Get active story
-        result = await session.execute(
-            select(Story).where(Story.user_id == user.id, Story.is_active == 1)
-        )
-        active_story = result.scalar_one_or_none()
+        story_repo = StoryRepository(session)
+        active_story = await story_repo.get_active_by_user_id(user.id)
         
-        # Create memory with INTERNAL user.id and story_id
-        memory = Memory(
+        # Create memory with INTERNAL user.id and story_id via repository
+        memory_repo = MemoryRepository(session)
+        await memory_repo.create(
             user_id=user.id,
             story_id=active_story.id if active_story else None,
             content=caption,
@@ -60,7 +54,6 @@ async def handle_photo_message(message: Message) -> None:
             tags=tags,
             file_id=file.file_id
         )
-        session.add(memory)
         await session.commit()
         
     # Send confirmation

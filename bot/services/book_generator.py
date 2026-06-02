@@ -1,15 +1,14 @@
 """Book generation service using WeasyPrint and Jinja2."""
-import os
 import markdown
 from datetime import datetime, timedelta
 from pathlib import Path
-from sqlalchemy import select
 from jinja2 import Template
 from loguru import logger
-
-# ✅ ПРАВИЛЬНЫЙ ИМПОРТ: всегда импортируйте нужные классы явно
 from weasyprint import HTML, CSS
-from bot.services.story_maker import generate_chapter_story
+
+from bot.config import settings
+from bot.services.story_maker import generate_chapter_story, get_llm_client
+from db.repositories import UserRepository, StoryRepository, MemoryRepository, ChapterRepository
 
 
 def group_memories_by_week(memories: list) -> dict:
@@ -32,87 +31,17 @@ def group_memories_by_week(memories: list) -> dict:
     return dict(sorted(weeks.items(), reverse=True))
 
 
-async def generate_book(user_id_tg: int, session_factory, progress_callback=None, theme: str = 'classic', story_id: int = None, signature: str = None) -> str:
-    """Generate a PDF book from user's memories."""
-    
-    logger.info(f"Starting book generation for user {user_id_tg} with theme {theme} and story {story_id}")
-    
-    # 1. Fetch data from DB
-    async with session_factory() as session:
-        from db.models import User, Memory, Story, Chapter
-        from sqlalchemy.orm import selectinload
-        
-        result = await session.execute(
-            select(User.id).where(User.telegram_id == user_id_tg)
-        )
-        user_record = result.scalar_one_or_none()
-        
-        if not user_record:
-            raise ValueError("User not found in database")
-            
-        story_title = "Книга Воспоминаний"
-        story_filter = True
-        story_obj = None
-        
-        if story_id:
-            result = await session.execute(
-                select(Story)
-                .where(Story.id == story_id, Story.user_id == user_record)
-                .options(selectinload(Story.chapters))
-            )
-            story_obj = result.scalar_one_or_none()
-            if story_obj:
-                story_title = story_obj.title
-            story_filter = Memory.story_id == story_id
-        
-        result = await session.execute(
-            select(Memory)
-            .where(Memory.user_id == user_record)
-            .where(story_filter)
-            .order_by(Memory.created_at.asc())
-        )
-        memories = result.scalars().all()
-    
-    if not memories:
-        raise ValueError("No memories found for this story")
-    
-    logger.info(f"Found {len(memories)} memories for user {user_id_tg}")
-    
-    # Base directory definitions
-    base_dir = Path("/app")
-    
-    # Form absolute URL with file:// protocol for WeasyPrint
-    for memory in memories:
-        if memory.memory_type == "photo" and memory.file_id:
-            full_check_path = Path("/app/static/uploads/photos") / f"{memory.file_id}.jpg"
-            if full_check_path.exists():
-                memory.local_img_url = f"file:///app/static/uploads/photos/{memory.file_id}.jpg"
-                logger.info(f"🟢 Фото найдено и передано в HTML: {memory.local_img_url}")
-            else:
-                memory.local_img_url = None
-                logger.warning(f"🔴 ФОТО НЕ НАЙДЕНО на диске: {full_check_path}")
-        else:
-            memory.local_img_url = None
-
 async def validate_story_memories(story_id: int, user_id_tg: int, session_factory, memories: list = None) -> tuple[bool, str]:
     """Validate if the user has enough memories in the story to generate a book."""
-    from db.models import User, Memory
-    from sqlalchemy import select
-
     if memories is None:
         async with session_factory() as session:
-            result = await session.execute(
-                select(User.id).where(User.telegram_id == user_id_tg)
-            )
-            user_record = result.scalar_one_or_none()
+            user_repo = UserRepository(session)
+            user_record = await user_repo.get_by_telegram_id(user_id_tg)
             if not user_record:
                 return False, "Пользователь не найден в базе данных."
                 
-            result = await session.execute(
-                select(Memory)
-                .where(Memory.user_id == user_record, Memory.story_id == story_id)
-            )
-            memories = result.scalars().all()
+            memory_repo = MemoryRepository(session)
+            memories = await memory_repo.get_by_user_and_story(user_record.id, story_id)
         
     if not memories:
         return False, (
@@ -157,19 +86,14 @@ async def validate_story_memories(story_id: int, user_id_tg: int, session_factor
 
     return True, ""
 
+
 async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory, memories: list = None, progress_callback=None) -> bool:
     """Ensure chapters are generated and saved to DB for the given story."""
-    from db.models import Story, Chapter, Memory
-    from sqlalchemy.orm import selectinload
-    from sqlalchemy import select
     from bot.services.semantic_grouper import group_memories_semantically
-    from bot.services.story_maker import generate_chapter_story
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Story).where(Story.id == story_id).options(selectinload(Story.chapters))
-        )
-        story_obj = result.scalar_one_or_none()
+        story_repo = StoryRepository(session)
+        story_obj = await story_repo.get_by_id(story_id, load_chapters=True)
         
     if not story_obj:
         return False
@@ -180,27 +104,19 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
     # If memories are not passed, fetch them
     if not memories:
         async with session_factory() as session:
-            from db.models import User
-            result = await session.execute(
-                select(User.id).where(User.telegram_id == user_id_tg)
-            )
-            user_record = result.scalar_one_or_none()
+            user_repo = UserRepository(session)
+            user_record = await user_repo.get_by_telegram_id(user_id_tg)
             if not user_record:
                 return False
                 
-            result = await session.execute(
-                select(Memory)
-                .where(Memory.user_id == user_record, Memory.story_id == story_id)
-                .order_by(Memory.created_at.asc())
-            )
-            memories = result.scalars().all()
+            memory_repo = MemoryRepository(session)
+            memories = await memory_repo.get_by_user_and_story(user_record.id, story_id)
             
     # Validate the memories list
     is_valid, err_msg = await validate_story_memories(story_id, user_id_tg, session_factory, memories=memories)
     if not is_valid:
         raise ValueError(err_msg)
         
-    from bot.services.story_maker import get_llm_client
     llm_client = get_llm_client()
     
     semantic_groups = await group_memories_semantically(memories, client=llm_client)
@@ -208,7 +124,7 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
     
     # Log grouping LLM usage
     if semantic_groups:
-        provider = os.getenv("LLM_PROVIDER", "gigachat").lower()
+        provider = settings.llm_provider.lower()
         model_name = "llama-3.3-70b-versatile" if provider == "groq" else "GigaChat"
         from bot.services.llm_logger import log_llm_usage
         await log_llm_usage(
@@ -233,6 +149,7 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
             
     # Generate stories for each group and save to DB
     async with session_factory() as session:
+        chapter_repo = ChapterRepository(session)
         total_chapters = len(semantic_groups)
         for i, group in enumerate(semantic_groups, 1):
             if progress_callback:
@@ -254,7 +171,7 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
                 has_fallback = True
             else:
                 # Log chapter generation LLM usage
-                provider = os.getenv("LLM_PROVIDER", "gigachat").lower()
+                provider = settings.llm_provider.lower()
                 model_name = "llama-3.3-70b-versatile" if provider == "groq" else "GigaChat"
                 from bot.services.llm_logger import log_llm_usage
                 await log_llm_usage(
@@ -290,61 +207,42 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
                 story_md = '\n'.join(clean_lines).strip()
                 chapter_title = title_from_md
                 
-            # Save Chapter to DB
-            db_chapter = Chapter(
+            # Save Chapter to DB via repository
+            await chapter_repo.create(
                 story_id=story_id,
                 title=chapter_title,
                 content=story_md,
                 chapter_number=i,
                 memory_ids=",".join(map(str, memory_ids))
             )
-            session.add(db_chapter)
             
         await session.commit()
         
     return has_fallback
 
 
-async def generate_book(user_id_tg: int, session_factory, progress_callback=None, theme: str = 'classic', story_id: int = None, signature: str = None) -> str:
+async def generate_book(user_id_tg: int, session_factory, progress_callback=None, theme: str = 'classic', story_id: int = None, signature: str = None) -> tuple[str, bool]:
     """Generate a PDF book from user's memories."""
-    
     logger.info(f"Starting book generation for user {user_id_tg} with theme {theme} and story {story_id}")
     
     # 1. Fetch data from DB
     async with session_factory() as session:
-        from db.models import User, Memory, Story, Chapter
-        from sqlalchemy.orm import selectinload
-        
-        result = await session.execute(
-            select(User.id).where(User.telegram_id == user_id_tg)
-        )
-        user_record = result.scalar_one_or_none()
-        
+        user_repo = UserRepository(session)
+        user_record = await user_repo.get_by_telegram_id(user_id_tg)
         if not user_record:
             raise ValueError("User not found in database")
             
         story_title = "Книга Воспоминаний"
-        story_filter = True
         story_obj = None
         
+        story_repo = StoryRepository(session)
         if story_id:
-            result = await session.execute(
-                select(Story)
-                .where(Story.id == story_id, Story.user_id == user_record)
-                .options(selectinload(Story.chapters))
-            )
-            story_obj = result.scalar_one_or_none()
+            story_obj = await story_repo.get_by_id(story_id, load_chapters=True)
             if story_obj:
                 story_title = story_obj.title
-            story_filter = Memory.story_id == story_id
         
-        result = await session.execute(
-            select(Memory)
-            .where(Memory.user_id == user_record)
-            .where(story_filter)
-            .order_by(Memory.created_at.asc())
-        )
-        memories = result.scalars().all()
+        memory_repo = MemoryRepository(session)
+        memories = await memory_repo.get_by_user_and_story(user_record.id, story_id)
     
     if not memories:
         raise ValueError("No memories found for this story")
@@ -375,12 +273,8 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
         has_fallback = await ensure_chapters_exist(story_id, user_id_tg, session_factory, memories, progress_callback)
         # Reload chapters from DB
         async with session_factory() as session:
-            result = await session.execute(
-                select(Story)
-                .where(Story.id == story_id)
-                .options(selectinload(Story.chapters))
-            )
-            story_obj = result.scalar_one_or_none()
+            story_repo = StoryRepository(session)
+            story_obj = await story_repo.get_by_id(story_id, load_chapters=True)
             db_chapters = story_obj.chapters if story_obj else []
             
     if not db_chapters:

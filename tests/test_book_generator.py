@@ -34,7 +34,9 @@ async def test_generate_book(mock_markdown, mock_css, mock_html, mock_generate_c
     # Mock db session and query results
     mock_session = AsyncMock()
     mock_user_result = MagicMock()
-    mock_user_result.scalar_one_or_none.return_value = 1
+    mock_user = MagicMock(spec=User)
+    mock_user.id = 1
+    mock_user_result.scalar_one_or_none.return_value = mock_user
     
     mock_memory_result = MagicMock()
     mock_memory_result.scalars().all.return_value = [
@@ -63,8 +65,8 @@ async def test_generate_book(mock_markdown, mock_css, mock_html, mock_generate_c
 
 @pytest.mark.asyncio
 @patch('bot.services.semantic_grouper.group_memories_semantically', new_callable=AsyncMock)
-@patch('bot.services.story_maker.generate_chapter_story', new_callable=AsyncMock)
-@patch('bot.services.story_maker.get_llm_client')
+@patch('bot.services.book_generator.generate_chapter_story', new_callable=AsyncMock)
+@patch('bot.services.book_generator.get_llm_client')
 async def test_ensure_chapters_exist(mock_get_client, mock_generate_chapter, mock_group_semantically):
     mock_client = MagicMock()
     mock_client.last_prompt_tokens = 100
@@ -88,7 +90,9 @@ async def test_ensure_chapters_exist(mock_get_client, mock_generate_chapter, moc
     mock_story_result.scalar_one_or_none.return_value = mock_story_obj
     
     mock_user_result = MagicMock()
-    mock_user_result.scalar_one_or_none.return_value = 1
+    mock_user = MagicMock(spec=User)
+    mock_user.id = 1
+    mock_user_result.scalar_one_or_none.return_value = mock_user
     
     mock_memories = [
         Memory(id=1, content="Кот спал на мягком диване весь день", created_at=datetime.datetime(2023, 10, 1), memory_type="text"),

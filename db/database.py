@@ -1,13 +1,13 @@
 """Database connection and session management."""
-import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from loguru import logger
 from typing import AsyncGenerator
+from bot.config import settings
 
 
 # Database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@db:5432/memory_book")
+DATABASE_URL = settings.database_url
 
 # Create async engine
 engine = create_async_engine(

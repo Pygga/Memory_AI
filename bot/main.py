@@ -14,6 +14,7 @@ from bot.handlers.voice import register_voice_handlers
 from bot.handlers.photo import register_photo_handlers
 from bot.handlers.commands import register_command_handlers
 from bot.handlers.callbacks import register_callback_handlers
+from bot.handlers.errors import register_error_handlers
 
 # Configure logging
 logging.basicConfig(
@@ -36,14 +37,10 @@ async def main():
     await init_db()
     logger.info("Database initialized successfully")
     
-    # Get bot token from environment
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
-    
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    from bot.config import settings
+    token = settings.telegram_bot_token
     if not token:
-        logger.error("TELEGRAM_BOT_TOKEN not found in environment")
+        logger.error("TELEGRAM_BOT_TOKEN not found in settings")
         return
     
     # Create bot and dispatcher
@@ -56,6 +53,7 @@ async def main():
     register_voice_handlers(dp)
     register_photo_handlers(dp)
     register_callback_handlers(dp)
+    register_error_handlers(dp)
     
     logger.info("Bot handlers registered")
     

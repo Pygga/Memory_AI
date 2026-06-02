@@ -6,9 +6,11 @@ from loguru import logger
 from db.models import Memory
 from bot.services.llm import GigaChatClient, GroqClient, BaseLLMClient
 
+from bot.config import settings
+
 def get_llm_client() -> BaseLLMClient:
     """Factory to get the configured LLM client."""
-    provider = os.getenv("LLM_PROVIDER", "gigachat").lower()
+    provider = settings.llm_provider.lower()
     if provider == "groq":
         return GroqClient()
     return GigaChatClient()
@@ -61,7 +63,7 @@ async def generate_chapter_story(memories: List[Memory], week_date_str: str, cli
             memories_text += f"- [{date_str}] Текст: {m.content} {tags}\n"
             
     # Hash for caching
-    redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    redis_url = settings.redis_url
     redis_client = redis_async.from_url(redis_url)
     
     cache_key = f"story:{hashlib.sha256(memories_text.encode()).hexdigest()}"

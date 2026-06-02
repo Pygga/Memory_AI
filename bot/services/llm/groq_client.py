@@ -4,13 +4,14 @@ from typing import Optional
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from bot.config import settings
 from .base import BaseLLMClient
 
 class GroqClient(BaseLLMClient):
     """Client for Groq API."""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GROQ_API_KEY") 
+        self.api_key = api_key or settings.groq_api_key 
         self.base_url = "https://api.groq.com/openai/v1"
         self.last_prompt_tokens = 0
         self.last_completion_tokens = 0
