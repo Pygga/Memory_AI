@@ -94,6 +94,69 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
         else:
             memory.local_img_url = None
 
+async def validate_story_memories(story_id: int, user_id_tg: int, session_factory, memories: list = None) -> tuple[bool, str]:
+    """Validate if the user has enough memories in the story to generate a book."""
+    from db.models import User, Memory
+    from sqlalchemy import select
+
+    if memories is None:
+        async with session_factory() as session:
+            result = await session.execute(
+                select(User.id).where(User.telegram_id == user_id_tg)
+            )
+            user_record = result.scalar_one_or_none()
+            if not user_record:
+                return False, "Пользователь не найден в базе данных."
+                
+            result = await session.execute(
+                select(Memory)
+                .where(Memory.user_id == user_record, Memory.story_id == story_id)
+            )
+            memories = result.scalars().all()
+        
+    if not memories:
+        return False, (
+            "📭 <b>В этой книге пока нет воспоминаний!</b>\n\n"
+            "Пожалуйста, сначала отправьте боту несколько воспоминаний (текст, фото или голос), "
+            "чтобы мы могли сгенерировать для вас книгу."
+        )
+        
+    # Count words and details
+    words = []
+    for m in memories:
+        if m.content:
+            words.extend([w for w in m.content.split() if w.strip()])
+    words_count = len(words)
+    
+    # If there is only one memory, check if it's a photo or a very short text/word
+    if len(memories) == 1:
+        m = memories[0]
+        if m.memory_type == 'photo':
+            return False, (
+                "⚠️ <b>Слишком мало контента для генерации!</b>\n\n"
+                "У вас добавлена всего одна фотография без описания. Пожалуйста, добавьте текстовые "
+                "воспоминания, голосовые заметки или подробные описания к фото, чтобы мы могли составить рассказ."
+            )
+        elif words_count <= 2:
+            return False, (
+                "⚠️ <b>Слишком мало контента для генерации!</b>\n\n"
+                "Ваше единственное воспоминание слишком короткое (всего пара слов). "
+                "Пожалуйста, напишите более подробные истории или отправьте голосовое сообщение, "
+                "чтобы ИИ смог составить полноценный рассказ."
+            )
+            
+    # Check if the total word count across all memories is very small
+    if words_count < 5:
+        num_photos = sum(1 for m in memories if m.memory_type == 'photo')
+        if num_photos <= 1:
+            return False, (
+                "⚠️ <b>Слишком мало контента для генерации!</b>\n\n"
+                "Общий объем ваших воспоминаний слишком мал (всего несколько слов). "
+                "Пожалуйста, добавьте больше подробностей, рассказов или фотографий с текстовым контекстом."
+            )
+
+    return True, ""
+
 async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory, memories: list = None, progress_callback=None) -> bool:
     """Ensure chapters are generated and saved to DB for the given story."""
     from db.models import Story, Chapter, Memory
@@ -132,8 +195,10 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
             )
             memories = result.scalars().all()
             
-    if not memories:
-        return False
+    # Validate the memories list
+    is_valid, err_msg = await validate_story_memories(story_id, user_id_tg, session_factory, memories=memories)
+    if not is_valid:
+        raise ValueError(err_msg)
         
     from bot.services.story_maker import get_llm_client
     llm_client = get_llm_client()

@@ -91,8 +91,8 @@ async def test_ensure_chapters_exist(mock_get_client, mock_generate_chapter, moc
     mock_user_result.scalar_one_or_none.return_value = 1
     
     mock_memories = [
-        Memory(id=1, content="Кот спал", created_at=datetime.datetime(2023, 10, 1), memory_type="text"),
-        Memory(id=2, content="Пес бегал", created_at=datetime.datetime(2023, 10, 2), memory_type="text")
+        Memory(id=1, content="Кот спал на мягком диване весь день", created_at=datetime.datetime(2023, 10, 1), memory_type="text"),
+        Memory(id=2, content="Пес бегал по зеленому лугу за мячиком", created_at=datetime.datetime(2023, 10, 2), memory_type="text")
     ]
     
     mock_memory_result = MagicMock()
@@ -117,3 +117,52 @@ async def test_ensure_chapters_exist(mock_get_client, mock_generate_chapter, moc
     # Verify session added two chapters
     assert mock_session.add.call_count == 2
     mock_session.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_story_memories_empty():
+    from bot.services.book_generator import validate_story_memories
+    mock_session_factory = MagicMock()
+    is_valid, err = await validate_story_memories(story_id=1, user_id_tg=123, session_factory=mock_session_factory, memories=[])
+    assert is_valid is False
+    assert "нет воспоминаний" in err
+
+
+@pytest.mark.asyncio
+async def test_validate_story_memories_single_photo():
+    from bot.services.book_generator import validate_story_memories
+    from db.models import Memory
+    mock_session_factory = MagicMock()
+    memories = [
+        Memory(id=1, content="", memory_type="photo")
+    ]
+    is_valid, err = await validate_story_memories(story_id=1, user_id_tg=123, session_factory=mock_session_factory, memories=memories)
+    assert is_valid is False
+    assert "всего одна фотография" in err
+
+
+@pytest.mark.asyncio
+async def test_validate_story_memories_too_short():
+    from bot.services.book_generator import validate_story_memories
+    from db.models import Memory
+    mock_session_factory = MagicMock()
+    memories = [
+        Memory(id=1, content="Кот", memory_type="text")
+    ]
+    is_valid, err = await validate_story_memories(story_id=1, user_id_tg=123, session_factory=mock_session_factory, memories=memories)
+    assert is_valid is False
+    assert "слишком короткое" in err
+
+
+@pytest.mark.asyncio
+async def test_validate_story_memories_valid():
+    from bot.services.book_generator import validate_story_memories
+    from db.models import Memory
+    mock_session_factory = MagicMock()
+    memories = [
+        Memory(id=1, content="Сегодня был отличный и очень солнечный день.", memory_type="text"),
+        Memory(id=2, content="Мы пошли гулять в большой парк всей семьей.", memory_type="text")
+    ]
+    is_valid, err = await validate_story_memories(story_id=1, user_id_tg=123, session_factory=mock_session_factory, memories=memories)
+    assert is_valid is True
+    assert err == ""

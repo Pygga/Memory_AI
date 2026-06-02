@@ -347,8 +347,20 @@ def md_to_telegram_html(text: str) -> str:
 async def handle_select_theme(callback: CallbackQuery) -> None:
     """Handle selecting theme after choosing PDF generation."""
     story_id = int(callback.data.replace("select_theme_", ""))
-    from bot.keyboards.main import get_theme_selection_keyboard
+    from bot.keyboards.main import get_theme_selection_keyboard, get_story_actions_keyboard
+    from bot.services.book_generator import validate_story_memories
+    from db.database import get_session_factory
     
+    session_factory = get_session_factory()
+    is_valid, err_msg = await validate_story_memories(story_id, callback.from_user.id, session_factory)
+    if not is_valid:
+        await callback.message.edit_text(
+            err_msg,
+            reply_markup=get_story_actions_keyboard(story_id)
+        )
+        await callback.answer()
+        return
+
     await callback.message.edit_text(
         "🎨 <b>Выберите дизайн вашей книги:</b>\n\n"
         "• <b>Классический</b> - строгий стиль, шрифты с засечками.\n"
@@ -402,9 +414,14 @@ async def handle_view_chapters_list(callback: CallbackQuery) -> None:
         try:
             await ensure_chapters_exist(story_id, callback.from_user.id, session_factory, progress_callback=progress_cb)
             await status_msg.delete()
+        except ValueError as ve:
+            logger.warning(f"Validation error generating chapters: {ve}")
+            await status_msg.edit_text(str(ve), reply_markup=get_story_actions_keyboard(story_id))
+            await callback.answer()
+            return
         except Exception as e:
             logger.error(f"Error generating chapters in callback: {e}")
-            await status_msg.edit_text("❌ Произошла ошибка при создании глав.")
+            await status_msg.edit_text("❌ Произошла ошибка при создании глав.", reply_markup=get_story_actions_keyboard(story_id))
             await callback.answer()
             return
             
@@ -669,9 +686,20 @@ async def handle_trigger_rebuild_story(callback: CallbackQuery) -> None:
                 pass
                 
         # Generate new chapters
-        await ensure_chapters_exist(story_id, callback.from_user.id, session_factory, progress_callback=progress_cb)
-        await status_msg.delete()
-        await callback.answer("✨ Книга полностью пересобрана!", show_alert=True)
+        try:
+            await ensure_chapters_exist(story_id, callback.from_user.id, session_factory, progress_callback=progress_cb)
+            await status_msg.delete()
+            await callback.answer("✨ Книга полностью пересобрана!", show_alert=True)
+        except ValueError as ve:
+            logger.warning(f"Validation error rebuilding chapters: {ve}")
+            await status_msg.edit_text(str(ve), reply_markup=get_story_actions_keyboard(story_id))
+            await callback.answer()
+            return
+        except Exception as e:
+            logger.error(f"Error rebuilding chapters: {e}")
+            await status_msg.edit_text("❌ Произошла ошибка при пересоздании глав.", reply_markup=get_story_actions_keyboard(story_id))
+            await callback.answer()
+            return
         
         # Load new chapters and display list
         async with session_factory() as session:
