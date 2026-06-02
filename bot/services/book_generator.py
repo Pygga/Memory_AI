@@ -9,6 +9,7 @@ from weasyprint import HTML, CSS
 from bot.config import settings
 from bot.services.story_maker import generate_chapter_story, get_llm_client
 from db.repositories import UserRepository, StoryRepository, MemoryRepository, ChapterRepository
+from utils.text import extract_title_from_markdown
 
 
 def group_memories_by_week(memories: list) -> dict:
@@ -184,27 +185,10 @@ async def ensure_chapters_exist(story_id: int, user_id_tg: int, session_factory,
                     session_factory=session_factory
                 )
                 
-            # Extract title from markdown if possible
-            title_from_md = None
-            lines = story_md.strip().split('\n')
-            clean_lines = []
-            found_title = False
-            for line in lines:
-                stripped_line = line.strip()
-                if not found_title and stripped_line.startswith('# '):
-                    title_from_md = stripped_line[2:].strip().strip('*').strip('_').strip('"').strip("'")
-                    found_title = True
-                elif not found_title and stripped_line.lower().startswith('title:'):
-                    title_from_md = stripped_line[6:].strip().strip('*').strip('_').strip('"').strip("'")
-                    found_title = True
-                elif not found_title and stripped_line.lower().startswith('название:'):
-                    title_from_md = stripped_line[9:].strip().strip('*').strip('_').strip('"').strip("'")
-                    found_title = True
-                else:
-                    clean_lines.append(line)
-            
-            if found_title:
-                story_md = '\n'.join(clean_lines).strip()
+            # Extract title from markdown using shared utility
+            title_from_md, cleaned_md = extract_title_from_markdown(story_md)
+            if title_from_md:
+                story_md = cleaned_md
                 chapter_title = title_from_md
                 
             # Save Chapter to DB via repository
@@ -313,12 +297,16 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
                 date_str = memory.created_at.strftime('%d.%m.%Y')
                 photo_html = (
                     f'<div class="memory-photo-fullpage" style="text-align:center; margin: 30px 0; page-break-inside: avoid;">'
-                    f'<img src="{memory.local_img_url}" alt="Фотография" style="max-width:100%; max-height:400px; border-radius:var(--photo-border-radius);">'
+                    f'<img src="{memory.local_img_url}" alt="Фотография" style="max-width:100%; max-height:400px;">'
                     f'{caption_html}'
                     f'<div class="photo-date" style="font-size: 9pt; color: #999; margin-top: 5px;">{date_str}</div>'
                     f'</div>'
                 )
-                if photo_tag in story_html:
+                # Markdown wraps standalone markers in paragraphs. Replace the whole paragraph first to keep HTML valid.
+                p_photo_tag = f"<p>{photo_tag}</p>"
+                if p_photo_tag in story_html:
+                    story_html = story_html.replace(p_photo_tag, photo_html)
+                elif photo_tag in story_html:
                     story_html = story_html.replace(photo_tag, photo_html)
                     
         chapters_for_render.append({

@@ -46,15 +46,15 @@ async def test_groq_generate_text(mock_post):
 
 @pytest.mark.asyncio
 @patch('bot.services.story_maker.get_llm_client')
-@patch('bot.services.story_maker.redis_async.from_url')
-async def test_generate_chapter_story_success(mock_redis, mock_get_client, mock_memories):
+@patch('bot.services.story_maker.get_redis')
+async def test_generate_chapter_story_success(mock_get_redis, mock_get_client, mock_memories):
     mock_client = AsyncMock()
     mock_client.generate_text.return_value = "Generated cohesive story"
     mock_get_client.return_value = mock_client
     
     mock_redis_client = AsyncMock()
     mock_redis_client.get.return_value = None
-    mock_redis.return_value = mock_redis_client
+    mock_get_redis.return_value = mock_redis_client
     
     story, is_fallback = await generate_chapter_story(mock_memories, "01.10.2023")
     
@@ -65,8 +65,8 @@ async def test_generate_chapter_story_success(mock_redis, mock_get_client, mock_
 
 @pytest.mark.asyncio
 @patch('bot.services.story_maker.get_llm_client')
-@patch('bot.services.story_maker.redis_async.from_url')
-async def test_generate_chapter_story_fallback(mock_redis, mock_get_client, mock_memories):
+@patch('bot.services.story_maker.get_redis')
+async def test_generate_chapter_story_fallback(mock_get_redis, mock_get_client, mock_memories):
     """Test fallback to text concatenation when LLM fails."""
     mock_client = AsyncMock()
     mock_client.generate_text.side_effect = Exception("LLM Error")
@@ -74,7 +74,7 @@ async def test_generate_chapter_story_fallback(mock_redis, mock_get_client, mock
     
     mock_redis_client = AsyncMock()
     mock_redis_client.get.return_value = None
-    mock_redis.return_value = mock_redis_client
+    mock_get_redis.return_value = mock_redis_client
     
     story, is_fallback = await generate_chapter_story(mock_memories, "01.10.2023")
     

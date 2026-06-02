@@ -80,6 +80,18 @@ def get_back_keyboard() -> InlineKeyboardMarkup:
     return keyboard
 
 
+def get_back_to_help_keyboard() -> InlineKeyboardMarkup:
+    """Create inline keyboard with a back button leading to help menu."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🔙 Назад", callback_data="menu_help")
+            ]
+        ]
+    )
+    return keyboard
+
+
 def get_main_menu_inline_keyboard() -> InlineKeyboardMarkup:
     """Create inline keyboard for main menu (for edit_text compatibility)."""
     keyboard = InlineKeyboardMarkup(
@@ -123,7 +135,7 @@ def get_stories_keyboard(stories: list) -> InlineKeyboardMarkup:
         status = "🟢" if story.is_active else "⚪"
         buttons.append([InlineKeyboardButton(text=f"{status} {story.title}", callback_data=f"select_story_{story.id}")])
     
-    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_skip_signature_keyboard() -> InlineKeyboardMarkup:

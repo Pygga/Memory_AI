@@ -5,7 +5,7 @@ from loguru import logger
 from db.database import get_session_factory
 from db.repositories import UserRepository, StoryRepository, MemoryRepository, ChapterRepository
 from utils.helpers import extract_tags
-from bot.keyboards.main import get_main_keyboard, get_back_keyboard
+from bot.keyboards.main import get_main_keyboard, get_back_keyboard, get_help_keyboard
 
 from aiogram.fsm.context import FSMContext
 from bot.states import StoryStates
@@ -86,7 +86,7 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             "• Нажмите <i>«🔄 Пересобрать книгу заново»</i>, если хотите полностью изменить структуру и сбросить правки.\n\n"
             "<b>Шаг 4: Скачивание PDF</b>\n"
             "В Кабинете книги нажмите <i>«🖨️ Сгенерировать PDF-книгу»</i>, выберите стиль оформления (Классика, Модерн, Бизнес), введите финальную подпись для задней обложки, и бот соберет для вас готовый файл!",
-            reply_markup=get_main_keyboard()
+            reply_markup=get_help_keyboard()
         )
         logger.info(f"User {message.from_user.id} clicked 'Help' button")
 
@@ -220,7 +220,7 @@ async def handle_chapter_edit_input(message: Message, state: FSMContext) -> None
         await message.answer("❌ Ошибка: глава не найдена после обновления.")
         return
         
-    from bot.handlers.callbacks import md_to_telegram_html
+    from utils.text import md_to_telegram_html
     from bot.keyboards.main import get_chapter_editor_keyboard
     
     escaped_content = md_to_telegram_html(chapter.content)

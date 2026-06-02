@@ -1,5 +1,5 @@
 """Photo message handlers."""
-import os
+from pathlib import Path
 from aiogram import Dispatcher, F
 from aiogram.types import Message
 from loguru import logger
@@ -18,12 +18,12 @@ async def handle_photo_message(message: Message) -> None:
     file = await message.bot.get_file(photo.file_id)
     
     # Create directory for photos
-    photo_dir = "static/uploads/photos"
-    os.makedirs(photo_dir, exist_ok=True)
-    file_path = os.path.join(photo_dir, f"{file.file_id}.jpg")
+    photo_dir = Path("static/uploads/photos")
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    file_path = photo_dir / f"{file.file_id}.jpg"
     
     # Download the file
-    await message.bot.download_file(file.file_path, file_path)
+    await message.bot.download_file(file.file_path, str(file_path))
     
     # Get caption and extract tags
     caption = message.caption or ""

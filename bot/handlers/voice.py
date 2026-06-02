@@ -1,5 +1,5 @@
 """Voice message handlers with faster-whisper transcription."""
-import os
+from pathlib import Path
 import asyncio
 from aiogram import Dispatcher, F
 from aiogram.types import Message
@@ -54,18 +54,18 @@ async def handle_voice_message(message: Message) -> None:
     file = await message.bot.get_file(voice.file_id)
     
     # Create temp dir and path
-    temp_dir = "static/uploads/voice"
-    os.makedirs(temp_dir, exist_ok=True)
-    file_path = os.path.join(temp_dir, f"{file.file_id}.ogg")
+    temp_dir = Path("static/uploads/voice")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    file_path = temp_dir / f"{file.file_id}.ogg"
     
     # Download .ogg file from Telegram
-    await message.bot.download_file(file.file_path, destination=file_path)
+    await message.bot.download_file(file.file_path, destination=str(file_path))
     
     # Notify user
     await message.answer("🎤 Транскрибирую голосовое сообщение...")
     
     # Transcribe
-    transcribed_text = await transcribe_voice(file_path)
+    transcribed_text = await transcribe_voice(str(file_path))
     
     # Extract hashtags from transcribed text
     tags = extract_tags(transcribed_text)
@@ -99,7 +99,7 @@ async def handle_voice_message(message: Message) -> None:
     
     # Cleanup temp file
     try:
-        os.remove(file_path)
+        file_path.unlink(missing_ok=True)
     except OSError as e:
         logger.warning(f"Failed to delete temp file {file_path}: {e}")
     

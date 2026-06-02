@@ -116,6 +116,15 @@ class MemoryRepository(BaseRepository):
         )
         return (result.rowcount or 0) > 0
 
+    async def get_by_ids(self, memory_ids: list[int]) -> list[Memory]:
+        """Fetch multiple memories by their IDs, ordered by creation date."""
+        if not memory_ids:
+            return []
+        result = await self.session.execute(
+            select(Memory).where(Memory.id.in_(memory_ids)).order_by(Memory.created_at.asc())
+        )
+        return list(result.scalars().all())
+
 
 class ChapterRepository(BaseRepository):
     async def create(self, story_id: int, title: str, content: str, chapter_number: int, memory_ids: Optional[str] = None) -> Chapter:
@@ -139,6 +148,12 @@ class ChapterRepository(BaseRepository):
     async def update_content(self, chapter_id: int, content: str) -> None:
         await self.session.execute(
             update(Chapter).where(Chapter.id == chapter_id).values(content=content)
+        )
+
+    async def update_title_and_content(self, chapter_id: int, title: str, content: str) -> None:
+        """Update both title and content of a chapter."""
+        await self.session.execute(
+            update(Chapter).where(Chapter.id == chapter_id).values(title=title, content=content)
         )
 
     async def delete_all_for_story(self, story_id: int) -> None:

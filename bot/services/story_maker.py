@@ -1,12 +1,11 @@
-import os
 import hashlib
-import redis.asyncio as redis_async
 from typing import List
 from loguru import logger
 from db.models import Memory
 from bot.services.llm import GigaChatClient, GroqClient, BaseLLMClient
 
 from bot.config import settings
+from bot.services.cache import get_redis
 
 def get_llm_client() -> BaseLLMClient:
     """Factory to get the configured LLM client."""
@@ -15,13 +14,15 @@ def get_llm_client() -> BaseLLMClient:
         return GroqClient()
     return GigaChatClient()
 
-async def generate_chapter_story(memories: List[Memory], week_date_str: str, client: BaseLLMClient = None) -> tuple[str, bool]:
+async def generate_chapter_story(memories: List[Memory], week_date_str: str, client: BaseLLMClient = None, bypass_cache: bool = False) -> tuple[str, bool]:
     """
     Generate a cohesive story for a week of memories using an LLM.
     
     Args:
         memories: List of Memory objects for the week.
         week_date_str: Formatted string representing the start of the week.
+        client: Optional LLM client to use.
+        bypass_cache: If True, skips cache lookup and forces a new generation.
         
     Returns:
         A tuple of (generated_story_string, is_fallback_boolean).
@@ -63,19 +64,18 @@ async def generate_chapter_story(memories: List[Memory], week_date_str: str, cli
             memories_text += f"- [{date_str}] Текст: {m.content} {tags}\n"
             
     # Hash for caching
-    redis_url = settings.redis_url
-    redis_client = redis_async.from_url(redis_url)
+    redis_client = await get_redis()
     
     cache_key = f"story:{hashlib.sha256(memories_text.encode()).hexdigest()}"
     
-    try:
-        cached_story = await redis_client.get(cache_key)
-        if cached_story:
-            logger.info(f"Using cached story for week {week_date_str}")
-            await redis_client.aclose()
-            return cached_story.decode('utf-8'), False
-    except Exception as e:
-        logger.warning(f"Redis cache error: {e}")
+    if not bypass_cache:
+        try:
+            cached_story = await redis_client.get(cache_key)
+            if cached_story:
+                logger.info(f"Using cached story for week {week_date_str}")
+                return cached_story.decode('utf-8'), False
+        except Exception as e:
+            logger.warning(f"Redis cache error: {e}")
         
     # Adjust max_tokens based on memories count
     # roughly 150 tokens per memory + 500 base
@@ -92,7 +92,6 @@ async def generate_chapter_story(memories: List[Memory], week_date_str: str, cli
         
         try:
             await redis_client.set(cache_key, story, ex=86400 * 30) # 30 days
-            await redis_client.aclose()
         except Exception as e:
             logger.warning(f"Failed to cache story: {e}")
             
