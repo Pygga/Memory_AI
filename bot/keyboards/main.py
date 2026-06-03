@@ -1,24 +1,6 @@
 """Keyboards for the bot."""
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-
-def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Create main menu keyboard with reply buttons."""
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text="🆕 Начать новую книгу"),
-                KeyboardButton(text="📚 Мои книги")
-            ],
-            [
-                KeyboardButton(text="💎 Профиль (Подписка)"),
-                KeyboardButton(text="❓ Помощь")
-            ]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=False
-    )
-    return keyboard
 
 
 def get_help_keyboard() -> InlineKeyboardMarkup:
@@ -93,20 +75,25 @@ def get_back_to_help_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_main_menu_inline_keyboard() -> InlineKeyboardMarkup:
-    """Create inline keyboard for main menu (for edit_text compatibility)."""
+    """Create inline keyboard for main menu."""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="📝 Добавить воспоминание", callback_data="menu_add"),
-                InlineKeyboardButton(text="📚 Мои воспоминания", callback_data="menu_list")
+                InlineKeyboardButton(text="🆕 Начать новую книгу", callback_data="menu_new_book")
             ],
             [
-                InlineKeyboardButton(text="📖 Создать книгу", callback_data="menu_book"),
-                InlineKeyboardButton(text="❓ Помощь", callback_data="menu_help")
+                InlineKeyboardButton(text="📚 Мои книги", callback_data="menu_book")
+            ],
+            [
+                InlineKeyboardButton(text="👤 Профиль и подписка", callback_data="menu_profile")
+            ],
+            [
+                InlineKeyboardButton(text="❓ Справка", callback_data="menu_help")
             ]
         ]
     )
     return keyboard
+
 
 def get_theme_selection_keyboard(story_id: int) -> InlineKeyboardMarkup:
     """Create inline keyboard for selecting book theme."""
@@ -152,25 +139,32 @@ def get_skip_signature_keyboard() -> InlineKeyboardMarkup:
     )
     return keyboard
 
-def get_story_actions_keyboard(story_id: int) -> InlineKeyboardMarkup:
+def get_story_actions_keyboard(story_id: int, is_active: bool = False) -> InlineKeyboardMarkup:
     """Create inline keyboard for book (story) actions cabinet."""
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📖 Читать / Редактировать главы", callback_data=f"manage_chaps_{story_id}")
-            ],
-            [
-                InlineKeyboardButton(text="🖨️ Сгенерировать PDF-книгу", callback_data=f"select_theme_{story_id}")
-            ],
-            [
-                InlineKeyboardButton(text="🔄 Пересобрать книгу заново", callback_data=f"rebuild_story_{story_id}")
-            ],
-            [
-                InlineKeyboardButton(text="🔙 К списку книг", callback_data="menu_book")
-            ]
+    buttons = [
+        [
+            InlineKeyboardButton(text="📖 Читать / Редактировать главы", callback_data=f"manage_chaps_{story_id}")
         ]
-    )
-    return keyboard
+    ]
+    
+    if not is_active:
+        buttons.append([
+            InlineKeyboardButton(text="📌 Сделать книгу текущей", callback_data=f"set_active_{story_id}")
+        ])
+        
+    buttons.extend([
+        [
+            InlineKeyboardButton(text="🖨️ Сгенерировать PDF-книгу", callback_data=f"select_theme_{story_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🔄 Пересобрать книгу заново", callback_data=f"rebuild_story_{story_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🔙 К списку книг", callback_data="menu_book")
+        ]
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 def get_chapters_list_keyboard(chapters: list, story_id: int) -> InlineKeyboardMarkup:
     """Create inline keyboard for list of chapters."""

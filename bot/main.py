@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, BotCommand
 from loguru import logger
 import sys
 
@@ -46,6 +46,15 @@ async def main():
     # Create bot and dispatcher
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
+    
+    # Set bot commands (Burger menu)
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Запуск бота и приветствие"),
+        BotCommand(command="menu", description="Главное меню (управление)"),
+        BotCommand(command="list", description="Последние воспоминания"),
+        BotCommand(command="help", description="Справка и инструкции")
+    ])
+    logger.info("Telegram command menu set successfully")
     
     # Register handlers
     register_command_handlers(dp)

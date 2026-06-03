@@ -1,27 +1,37 @@
 """Command handlers for the bot."""
 from aiogram import Dispatcher, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 from loguru import logger
 
 from db.database import get_session_factory
 from db.repositories import UserRepository, MemoryRepository, StoryRepository
-from bot.keyboards.main import get_main_keyboard, get_help_keyboard
+from bot.keyboards.main import get_main_menu_inline_keyboard, get_help_keyboard, get_back_keyboard
 
 
 async def cmd_start(message: Message) -> None:
     """Handle /start command."""
-    # Ensure user exists in DB
+    user_id_tg = message.from_user.id
     session_factory = get_session_factory()
     async with session_factory() as session:
         user_repo = UserRepository(session)
-        await user_repo.get_or_create(
-            telegram_id=message.from_user.id,
+        user_record = await user_repo.get_or_create(
+            telegram_id=user_id_tg,
             username=message.from_user.username,
             first_name=message.from_user.first_name,
             last_name=message.from_user.last_name
         )
         await session.commit()
+        
+        # Get active story and memories count
+        story_repo = StoryRepository(session)
+        active_story = await story_repo.get_active_by_user_id(user_record.id)
+        
+        memories_count = 0
+        if active_story:
+            memory_repo = MemoryRepository(session)
+            memories = await memory_repo.get_by_user_and_story(user_record.id, active_story.id)
+            memories_count = len(memories)
     
     await message.answer(
         "👋 <b>Добро пожаловать в Memory Book Bot!</b>\n\n"
@@ -31,13 +41,76 @@ async def cmd_start(message: Message) -> None:
         "• <b>Интерактивный редактор</b>: Вы можете читать главы прямо в Telegram, редактировать их вручную или перегенерировать одной кнопкой через ИИ в <i>Кабинете книги</i>.\n"
         "• <b>Красивый PDF-макет</b>: Поддержка изысканных шрифтов, книжных стандартов верстки, скругления фото и вашей финальной подписи.\n\n"
         "<b>Ваш план действий:</b>\n"
-        "1️⃣ Нажмите <b>«🆕 Начать новую книгу»</b> и введите название (например, 'Отпуск' или 'Дневник 2026').\n"
+        "1️⃣ Нажмите <b>«🆕 Начать новую книгу»</b> в меню ниже и введите название (например, 'Отпуск' или 'Дневник 2026').\n"
         "2️⃣ Отправляйте мне текст, фото или голосовые сообщения. Я сохраню всё в вашу текущую книгу.\n"
-        "3️⃣ Нажмите <b>«📖 Сгенерировать PDF»</b> или зайдите в <b>«📚 Архив книг»</b>, чтобы открыть <b>Кабинет книги</b>, отредактировать главы и скачать ваш шедевр!\n\n"
-        "Готовы начать? Жмите <b>«🆕 Начать новую книгу»</b> в меню ниже!",
-        reply_markup=get_main_keyboard()
+        "3️⃣ Перейдите в <b>«📚 Мои книги»</b>, чтобы открыть <b>Кабинет книги</b>, отредактировать главы и скачать ваш шедевр!",
+        reply_markup=ReplyKeyboardRemove()
     )
-    logger.info(f"User {message.from_user.id} started the bot")
+    
+    if active_story:
+        active_book_info = f"📖 <b>Текущая книга:</b> «{active_story.title}»\n"
+        if memories_count > 0:
+            active_book_info += f"✍️ <b>Накоплено воспоминаний:</b> {memories_count}\n"
+        else:
+            active_book_info += "✍️ <b>Воспоминаний пока нет.</b> Отправьте мне текст, фото или голосовое сообщение, чтобы добавить их!\n"
+    else:
+        active_book_info = "📖 <b>Текущая книга:</b> <i>Не выбрана</i>\n💡 Нажмите <b>«🆕 Начать новую книгу»</b> ниже, чтобы начать запись воспоминаний!\n"
+        
+    menu_text = (
+        "👋 <b>Главное меню Memory Book Bot</b>\n\n"
+        f"{active_book_info}\n"
+        "Выберите действие:"
+    )
+    
+    await message.answer(
+        menu_text,
+        reply_markup=get_main_menu_inline_keyboard()
+    )
+    logger.info(f"User {user_id_tg} started the bot")
+
+
+async def cmd_menu(message: Message) -> None:
+    """Handle /menu command."""
+    user_id_tg = message.from_user.id
+    session_factory = get_session_factory()
+    
+    async with session_factory() as session:
+        user_repo = UserRepository(session)
+        user_record = await user_repo.get_or_create(
+            telegram_id=user_id_tg,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name
+        )
+        story_repo = StoryRepository(session)
+        active_story = await story_repo.get_active_by_user_id(user_record.id)
+        
+        memories_count = 0
+        if active_story:
+            memory_repo = MemoryRepository(session)
+            memories = await memory_repo.get_by_user_and_story(user_record.id, active_story.id)
+            memories_count = len(memories)
+            
+    if active_story:
+        active_book_info = f"📖 <b>Текущая книга:</b> «{active_story.title}»\n"
+        if memories_count > 0:
+            active_book_info += f"✍️ <b>Накоплено воспоминаний:</b> {memories_count}\n"
+        else:
+            active_book_info += "✍️ <b>Воспоминаний пока нет.</b> Отправьте мне текст, фото или голосовое сообщение, чтобы добавить их!\n"
+    else:
+        active_book_info = "📖 <b>Текущая книга:</b> <i>Не выбрана</i>\n💡 Нажмите <b>«🆕 Начать новую книгу»</b> ниже, чтобы начать запись воспоминаний!\n"
+        
+    menu_text = (
+        "👋 <b>Главное меню Memory Book Bot</b>\n\n"
+        f"{active_book_info}\n"
+        "Выберите действие:"
+    )
+    
+    await message.answer(
+        menu_text,
+        reply_markup=get_main_menu_inline_keyboard()
+    )
+    logger.info(f"User {user_id_tg} opened main menu via command")
 
 
 async def cmd_help(message: Message) -> None:
@@ -68,7 +141,7 @@ async def cmd_add(message: Message) -> None:
         "Не забудьте добавить теги через #, например:\n"
         '"Отличный день на пляже #лето #отпуск"\n\n'
         "Вы также можете отправить голосовое сообщение или фото.",
-        reply_markup=get_main_keyboard()
+        reply_markup=get_back_keyboard()
     )
     logger.info(f"User {message.from_user.id} used /add command")
 
@@ -94,7 +167,7 @@ async def cmd_list(message: Message) -> None:
             "📭 У вас пока нет сохранённых воспоминаний.\n\n"
             "Отправьте мне сообщение, голосовую заметку или фото, "
             "и я сохраню это как воспоминание!",
-            reply_markup=get_main_keyboard()
+            reply_markup=get_back_keyboard()
         )
         return
     
@@ -105,7 +178,7 @@ async def cmd_list(message: Message) -> None:
         response += f"{i}. {content_preview}{tags}\n"
         response += f"   📅 {memory.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"
     
-    await message.answer(response, reply_markup=get_main_keyboard())
+    await message.answer(response, reply_markup=get_back_keyboard())
     logger.info(f"User {user_id_tg} listed memories")
 
 
@@ -124,7 +197,7 @@ async def cmd_book(message: Message) -> None:
         stories = await story_repo.get_all_by_user_id(user_record.id)
         
     if not stories:
-        await message.answer("У вас пока нет историй. Сначала создайте историю и добавьте воспоминания!")
+        await message.answer("У вас пока нет книг. Сначала создайте новую!")
         return
         
     from bot.keyboards.main import get_stories_keyboard
@@ -138,6 +211,7 @@ async def cmd_book(message: Message) -> None:
 def register_command_handlers(dp: Dispatcher) -> None:
     """Register all command handlers."""
     dp.message.register(cmd_start, CommandStart())
+    dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(cmd_help, Command("help"))
     dp.message.register(cmd_add, Command("add"))
     dp.message.register(cmd_list, Command("list"))

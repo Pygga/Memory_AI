@@ -1,11 +1,11 @@
 """Text message handlers."""
 from aiogram import Dispatcher, F
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 from loguru import logger
 from db.database import get_session_factory
 from db.repositories import UserRepository, StoryRepository, MemoryRepository, ChapterRepository
 from utils.helpers import extract_tags
-from bot.keyboards.main import get_main_keyboard, get_back_keyboard, get_help_keyboard
+from bot.keyboards.main import get_back_keyboard, get_help_keyboard, get_main_menu_inline_keyboard
 
 from aiogram.fsm.context import FSMContext
 from bot.states import StoryStates
@@ -16,6 +16,7 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
     text = message.text
     
     if text == "🆕 Начать новую книгу":
+        await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             "📝 <b>Новая книга</b>\n\n"
             "Как вы хотите назвать эту книгу? (например, 'Отпуск в горах 2026' или 'Мои выходные')\n\n"
@@ -23,7 +24,7 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             reply_markup=get_back_keyboard()
         )
         await state.set_state(StoryStates.waiting_for_story_title)
-        logger.info(f"User {message.from_user.id} clicked 'New book' button")
+        logger.info(f"User {message.from_user.id} clicked legacy 'New book' button")
 
     elif text in ["📚 Мои книги", "📚 Архив книг", "📖 Сгенерировать PDF"]:
         session_factory = get_session_factory()
@@ -39,18 +40,19 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             stories = await story_repo.get_all_by_user_id(user_record.id)
             
         if not stories:
-            await message.answer("У вас пока нет книг. Сначала создайте новую!")
+            await message.answer("У вас пока нет книг. Сначала создайте новую!", reply_markup=ReplyKeyboardRemove())
             return
             
         from bot.keyboards.main import get_stories_keyboard
+        await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             "📂 <b>Ваши книги:</b>\n"
             "<i>(выберите книгу для открытия Кабинета управления, редактирования глав и генерации PDF)</i>",
             reply_markup=get_stories_keyboard(stories)
         )
-        logger.info(f"User {message.from_user.id} wants to select a story")
+        logger.info(f"User {message.from_user.id} clicked legacy stories button")
         
-    elif text == "💎 Профиль (Подписка)":
+    elif text in ["💎 Профиль (Подписка)", "💎 Профиль"]:
         user_id_tg = message.from_user.id
         session_factory = get_session_factory()
         async with session_factory() as session:
@@ -62,17 +64,23 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             credits = getattr(user_record, "generation_credits", 0)
             
             from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-            pay_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="buy_credits")]])
+            profile_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💳 Пополнить баланс (Stars)", callback_data="buy_credits")],
+                [InlineKeyboardButton(text="🔙 Назад в меню", callback_data="back")]
+            ])
             
+            await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
             await message.answer(
                 f"👤 <b>Ваш профиль:</b>\n\n"
                 f"Уровень подписки: {tier}\n"
                 f"Осталось генераций PDF: <b>{credits}</b>\n\n"
                 f"<i>(Тестовый режим: у вас {credits} генераций)</i>",
-                reply_markup=pay_kb
+                reply_markup=profile_kb
             )
+            logger.info(f"User {message.from_user.id} clicked legacy profile button")
         
     elif text == "❓ Помощь":
+        await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             "ℹ️ <b>Как правильно пользоваться ботом:</b>\n\n"
             "<b>Шаг 1: Создание книги</b>\n"
@@ -88,7 +96,7 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             "В Кабинете книги нажмите <i>«🖨️ Сгенерировать PDF-книгу»</i>, выберите стиль оформления (Классика, Модерн, Бизнес), введите финальную подпись для задней обложки, и бот соберет для вас готовый файл!",
             reply_markup=get_help_keyboard()
         )
-        logger.info(f"User {message.from_user.id} clicked 'Help' button")
+        logger.info(f"User {message.from_user.id} clicked legacy help button")
 
 async def handle_story_title_input(message: Message, state: FSMContext) -> None:
     """Handle input for new story title."""
@@ -120,7 +128,7 @@ async def handle_story_title_input(message: Message, state: FSMContext) -> None:
     await message.answer(
         f"✅ <b>История «{title}» создана!</b>\n\n"
         f"Теперь все новые воспоминания будут сохраняться в неё.",
-        reply_markup=get_main_keyboard()
+        reply_markup=get_main_menu_inline_keyboard()
     )
     logger.info(f"User {user_id_tg} created new story: {title}")
 
