@@ -209,6 +209,14 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
     """Generate a PDF book from user's memories."""
     logger.info(f"Starting book generation for user {user_id_tg} with theme {theme} and story {story_id}")
     
+    # Map keyboard themes to HTML template themes
+    theme_mapping = {
+        'classic': 'literary',
+        'modern': 'album',
+        'business': 'modern'
+    }
+    html_theme = theme_mapping.get(theme, theme)
+    
     # 1. Fetch data from DB
     async with session_factory() as session:
         user_repo = UserRepository(session)
@@ -332,7 +340,7 @@ async def generate_book(user_id_tg: int, session_factory, progress_callback=None
     
     html_content = template.render(
         chapters=chapters_for_render,
-        theme=theme,
+        theme=html_theme,
         story_title=story_title,
         generated_at=datetime.now(),
         total_memories=len(memories),

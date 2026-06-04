@@ -4,84 +4,38 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ story_title }}</title>
+
+    {% if theme == 'literary' %}
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+        /* ════════════════════════════════════════════════════════
+           ШАБЛОН: «Литературное издание»  (theme = "literary")
+           Формат A5, рендер через WeasyPrint 60.x
+           ════════════════════════════════════════════════════════ */
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
 
         :root {
-            /* Базовые переменные по умолчанию (classic) */
-            --font-family: "EB Garamond", "Georgia", serif;
-            --heading-font: "Playfair Display", "Georgia", serif;
-            --bg-color: #fdfbf7;
-            /* Изысканная теплая бумага цвета слоновой кости */
-            --text-color: #333;
-            --cover-bg: linear-gradient(135deg, #f5f5dc 0%, #e8e8cc 100%);
-            --cover-text: #333;
-            --primary-color: #5a4b41;
-            --border-radius: 6px;
-            /* Мягкие скругления блоков воспоминаний */
-            --memory-bg: #f5f2eb;
-            /* Теплый бежевый тон для воспоминаний */
-            --memory-border: 4px solid var(--primary-color);
-            --photo-border-radius: 8px;
-            /* Премиальные скругленные углы для фото */
-            --tag-bg: #e0e0e0;
-            --tag-color: #555;
-            --header-bg: var(--cover-bg);
-            --header-text: var(--cover-text);
+            --paper: #fbf8f1;
+            --ink: #2b2622;
+            --ink-soft: #4a423a;
+            --muted: #8a7d6e;
+            --hair: #d8cab4;
+            --accent: #6e4a35;
+            --body: "EB Garamond", "Georgia", serif;
+            --display: "Cormorant Garamond", "Georgia", serif;
         }
 
-        /* Тема: Современный */
-        .theme-modern {
-            --font-family: "Inter", "Roboto", sans-serif;
-            --heading-font: "Montserrat", "Roboto", sans-serif;
-            --bg-color: #ffffff;
-            --text-color: #2c3e50;
-            --cover-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --cover-text: #ffffff;
-            --primary-color: #667eea;
-            --border-radius: 12px;
-            --memory-bg: #f8f9fa;
-            --memory-border: none;
-            --photo-border-radius: 12px;
-            --tag-bg: #e2e8f0;
-            --tag-color: #4a5568;
-            --header-bg: var(--cover-bg);
-            --header-text: var(--cover-text);
-        }
-
-        /* Тема: Деловой / Минимализм */
-        .theme-business {
-            --font-family: "Helvetica Neue", "Arial", sans-serif;
-            --heading-font: "Helvetica Neue", "Arial", sans-serif;
-            --bg-color: #ffffff;
-            --text-color: #1a1a1a;
-            --cover-bg: #2c3e50;
-            --cover-text: #ffffff;
-            --primary-color: #2c3e50;
-            --border-radius: 4px;
-            --memory-bg: #ffffff;
-            --memory-border: 1px solid #e0e0e0;
-            --photo-border-radius: 4px;
-            --tag-bg: #f1f1f1;
-            --tag-color: #333;
-            --header-bg: #f8f9fa;
-            --header-text: #2c3e50;
-        }
-
+        /* ── Страницы ── */
         @page {
             size: A5;
-            margin: 2cm;
-
-            @top-center {
-                content: "";
-                font-size: 10pt;
-                color: #666;
-            }
+            margin: 20mm 18mm 18mm;
+            background-color: #fbf8f1;
 
             @bottom-center {
-                content: counter(page);
-                font-size: 10pt;
-                color: #666;
+                content: "— " counter(page) " —";
+                font-family: "Cormorant Garamond", serif;
+                font-size: 11pt;
+                letter-spacing: 0.2em;
+                color: #8a7d6e;
             }
         }
 
@@ -92,10 +46,6 @@
             @bottom-center {
                 content: none;
             }
-
-            @top-center {
-                content: none;
-            }
         }
 
         @page end-page {
@@ -103,10 +53,6 @@
             margin: 0;
 
             @bottom-center {
-                content: none;
-            }
-
-            @top-center {
                 content: none;
             }
         }
@@ -122,517 +68,1506 @@
         }
 
         body {
-            font-family: var(--font-family);
+            font-family: var(--body);
+            color: var(--ink);
             line-height: 1.6;
-            color: var(--text-color);
-            background-color: transparent;
+            background: transparent;
         }
 
-        /* ════════════════════════════════════════════
-           D5: Обложка — элегантная типографика
-           ════════════════════════════════════════════ */
+        /* ─────────── Обложка ─────────── */
         .cover {
             page: cover-page;
+            position: relative;
             width: 148mm;
             height: 210mm;
-            box-sizing: border-box;
-            padding: 4.5cm 2cm 2cm 2cm;
-            text-align: center;
-            color: var(--cover-text);
-            background: var(--cover-bg);
-            page-break-after: always;
             overflow: hidden;
+            background: var(--paper);
+            page-break-after: always;
         }
 
-        /* WeasyPrint workaround: explicit background for themes */
-        body.theme-modern .cover,
-        body.theme-modern .back-cover {
-            background: #667eea;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
+        .page-frame {
+            position: fixed;
+            inset: 10mm;
+            border: 1px solid var(--hair);
+            z-index: 1;
+            pointer-events: none;
         }
 
-        body.theme-business .cover,
-        body.theme-business .back-cover {
-            background: #2c3e50;
-            color: #ffffff;
+        .page-frame::before {
+            content: "";
+            position: absolute;
+            inset: 2.4mm;
+            border: 1px solid rgba(110, 74, 53, 0.35);
         }
 
-        body.theme-classic .cover,
-        body.theme-classic .back-cover {
-            background: #f5f5dc;
-            background: linear-gradient(135deg, #f5f5dc 0%, #e8e8cc 100%);
-            color: #333;
+        .cover-inner {
+            position: absolute;
+            z-index: 2;
+            top: 0;
+            left: 22mm;
+            width: 104mm;
+            height: 210mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
-        .cover-ornament {
-            font-size: 14pt;
-            letter-spacing: 12px;
-            color: var(--cover-text);
-            opacity: 0.5;
+        .cover-kicker {
+            font-family: var(--display);
+            text-transform: uppercase;
+            letter-spacing: 0.5em;
+            font-size: 12pt;
+            color: var(--accent);
             margin-bottom: 30px;
+        }
+
+        .cover-mark {
+            font-family: var(--display);
+            font-size: 22pt;
+            color: var(--accent);
+            margin-bottom: 28px;
+            opacity: 0.8;
         }
 
         .cover h1 {
-            font-family: var(--heading-font);
-            font-size: 32pt;
-            margin-bottom: 16px;
-            line-height: 1.15;
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 46pt;
+            line-height: 1.04;
+            letter-spacing: 0.01em;
+            margin-bottom: 22px;
         }
 
         .cover .subtitle {
-            font-size: 13pt;
-            opacity: 0.85;
-            margin-bottom: 10px;
+            font-family: var(--display);
             font-style: italic;
-            letter-spacing: 1px;
+            font-size: 16pt;
+            color: var(--ink-soft);
+            letter-spacing: 0.02em;
         }
 
-        .cover-line {
-            width: 60px;
-            height: 2px;
-            background: var(--cover-text);
-            margin: 28px auto;
-            opacity: 0.4;
+        .cover-rule {
+            width: 46px;
+            height: 1px;
+            background: var(--accent);
+            margin: 18px auto;
+            opacity: 0.6;
         }
 
         .cover .dates {
-            font-size: 11pt;
-            opacity: 0.7;
-            margin-top: 1.5cm;
-            letter-spacing: 1px;
+            font-family: var(--display);
+            font-size: 13pt;
+            letter-spacing: 0.22em;
+            color: var(--muted);
         }
 
-        /* ── Table of Contents ── */
+        /* ─────────── Содержание ─────────── */
         .toc {
             page-break-after: always;
-            padding: 40px 0;
+            padding-top: 6mm;
         }
 
-        .toc h2 {
-            font-size: 24pt;
-            margin-bottom: 30px;
-            color: var(--primary-color);
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 10px;
+        .section-eyebrow {
+            font-family: var(--display);
+            text-transform: uppercase;
+            letter-spacing: 0.42em;
+            font-size: 11pt;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        .section-title {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 30pt;
+            margin-bottom: 4px;
+        }
+
+        .toc-rule {
+            height: 1px;
+            background: var(--hair);
+            margin: 18px 0 24px;
         }
 
         .toc ul {
             list-style: none;
-            padding: 0;
         }
 
         .toc-item {
-            margin: 20px 0;
-            font-size: 12pt;
+            padding: 16px 0;
+            border-bottom: 1px dotted rgba(138, 125, 110, 0.35);
         }
 
         .toc-item a {
-            display: flex;
-            align-items: flex-end;
+            display: block;
             text-decoration: none;
-            color: var(--text-color);
-            width: 100%;
+            color: var(--ink);
+        }
+
+        .toc-num {
+            display: inline-block;
+            font-family: var(--display);
+            font-size: 13pt;
+            color: var(--accent);
+            width: 35px;
         }
 
         .toc-name {
-            order: 1;
-            font-weight: bold;
+            display: inline;
+            font-size: 13pt;
+            color: var(--ink);
+        }
+
+        .toc-item a::after {
+            content: " " leader('.') " " target-counter(attr(href), page);
+            font-family: var(--display);
+            font-size: 13pt;
+            color: var(--accent);
         }
 
         .toc-subtitle {
-            display: block;
-            font-size: 9pt;
-            color: #666;
-            margin-top: 4px;
-            font-weight: normal;
+            margin-left: 35px;
+            font-family: var(--body);
+            font-style: italic;
+            font-size: 11pt;
+            color: var(--muted);
+            margin-top: 5px;
         }
 
-        .toc-dots {
-            flex-grow: 1;
-            border-bottom: 1px dotted #bbb;
-            margin: 0 10px 5px 10px;
-            order: 2;
-        }
-
-        .toc-page {
-            order: 3;
-            color: var(--primary-color);
-            font-weight: bold;
-            background: var(--bg-color);
-            padding-left: 5px;
-        }
-
-        .toc-page::after {
-            content: target-counter(attr(href), page);
-        }
-
-        /* ════════════════════════════════════════════
-           Chapter Pages
-           ════════════════════════════════════════════ */
+        /* ─────────── Глава ─────────── */
         .chapter {
             page-break-before: always;
-            padding-top: 1cm;
         }
 
-        .chapter-header {
-            text-align: left;
-            margin-bottom: 40px;
-            border-bottom: 1px solid var(--primary-color);
-            padding-bottom: 15px;
-        }
-
-        /* D2: Декоративный разделитель под заголовком главы */
-        .chapter-header::after {
-            content: "❧";
-            display: block;
+        .chapter-head {
             text-align: center;
-            font-size: 16pt;
-            color: var(--primary-color);
-            margin-top: 14px;
-            opacity: 0.5;
-        }
-
-        /* Для бизнес-темы — строгая линия вместо орнамента */
-        body.theme-business .chapter-header {
-            border-bottom: 3px solid var(--primary-color);
-        }
-
-        body.theme-business .chapter-header::after {
-            content: none;
-        }
-
-        /* ── D9: Modern-тема — градиентный заголовок главы ── */
-        body.theme-modern .chapter-header {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
-            border-radius: 12px;
-            padding: 20px 25px;
-            border-bottom: none;
-            border-left: 4px solid #667eea;
-        }
-
-        body.theme-modern .chapter-header::after {
-            content: none;
+            margin: 12mm 0 14mm;
         }
 
         .chapter-num {
-            font-size: 11pt;
+            font-family: var(--display);
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--primary-color);
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-
-        .chapter-header h2 {
-            font-size: 22pt;
-            margin-bottom: 8px;
-            color: var(--text-color);
-            font-family: var(--heading-font);
-            line-height: 1.2;
-            text-align: left;
-        }
-
-        .chapter-header .dates {
-            font-size: 10pt;
-            color: #666;
-            font-style: italic;
-        }
-
-        /* ── Memory Entries ── */
-        .memory {
-            margin-bottom: 25px;
-            padding: 15px;
-            background: var(--memory-bg);
-            border-left: var(--memory-border);
-            border-radius: var(--border-radius);
-            page-break-inside: avoid;
-        }
-
-        body.theme-business .memory {
-            border-left: none;
-        }
-
-        .memory-text {
+            letter-spacing: 0.4em;
             font-size: 11pt;
-            line-height: 1.7;
-            margin-bottom: 10px;
+            color: var(--accent);
+            margin-bottom: 16px;
         }
 
-        .memory-meta {
-            font-size: 9pt;
-            color: #666;
-            margin-top: 10px;
-            overflow: hidden;
+        .chapter-head h2 {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 30pt;
+            line-height: 1.1;
         }
 
-        .memory-date {
-            float: left;
+        .chapter-head::after {
+            content: "❧";
+            display: block;
+            font-size: 16pt;
+            color: var(--accent);
+            opacity: 0.55;
+            margin-top: 16px;
         }
 
-        .memory-type {
-            float: right;
-            background: var(--primary-color);
-            color: #fff;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 8pt;
-        }
-
-        .tags {
-            margin-top: 8px;
-            clear: both;
-        }
-
-        .tag {
-            display: inline-block;
-            background: var(--tag-bg);
-            color: var(--tag-color);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 8pt;
-            margin-right: 5px;
-        }
-
-        /* ════════════════════════════════════════════
-           D4: Улучшенный стиль фотографий
-           ════════════════════════════════════════════ */
-        .memory-photo-container {
-            text-align: center;
-            margin: 15px 0;
-        }
-
-        .memory-photo-fullpage {
-            text-align: center;
-            margin: 30px auto;
-            page-break-inside: avoid;
-        }
-
-        .memory-photo-fullpage img {
-            max-width: 100%;
-            max-height: 400px;
-            object-fit: contain;
-            display: inline-block;
-        }
-
-        .photo-caption {
-            font-size: 9.5pt;
-            font-style: italic;
-            color: #666;
-            margin-top: 10px;
-            max-width: 80%;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .photo-date {
-            font-size: 8pt;
-            color: #aaa;
-            margin-top: 4px;
-        }
-
-        /* ── Chapter text formatting ── */
+        /* ─────────── Текст главы (chapter.story_html) ─────────── */
         .chapter-story {
-            font-size: 12pt;
-            line-height: 1.8;
+            font-size: 12.5pt;
+            line-height: 1.78;
             text-align: justify;
+            hyphens: auto;
         }
 
         .chapter-story p {
-            margin-bottom: 16px;
-            text-indent: 1cm;
-            text-align: justify;
+            text-indent: 1.25em;
+            margin: 0;
         }
 
-        /* D1: Буквица (Drop Cap) — первая буква первого абзаца */
-        .chapter-story>p:first-of-type::first-letter {
-            font-size: 2.8em;
-            font-weight: bold;
-            color: var(--primary-color);
-            font-family: var(--heading-font);
-            margin-right: 4px;
-            line-height: 1;
-            vertical-align: -10%;
-        }
-
-        /* Первый абзац без отступа (с буквицей он не нужен) */
         .chapter-story>p:first-of-type {
             text-indent: 0;
         }
 
-        .chapter-story h1,
+        .chapter-story>p:first-of-type::first-letter {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 2.3em;
+            line-height: 1;
+            color: var(--accent);
+            padding-right: 0.04em;
+        }
+
         .chapter-story h2,
         .chapter-story h3 {
-            margin-top: 24px;
-            margin-bottom: 12px;
+            font-family: var(--display);
             text-align: left;
+            text-indent: 0;
+            margin: 22px 0 10px;
+            color: var(--accent);
+        }
+
+        .chapter-story hr {
+            border: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .chapter-story hr::before {
+            content: "✦ ✦ ✦";
+            color: var(--accent);
+            opacity: 0.5;
+            letter-spacing: 0.6em;
+            font-size: 11pt;
+        }
+
+        /* Фото внутри текста главы */
+        .chapter-story img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 22px auto 6px;
+            padding: 7px;
+            background: #fff;
+            border: 1px solid var(--hair);
+        }
+
+        .chapter-story figure {
+            margin: 24px 0;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+
+        .chapter-story figure img {
+            margin-bottom: 0;
+        }
+
+        .chapter-story figcaption {
+            font-family: var(--display);
+            font-style: italic;
+            font-size: 11pt;
+            color: var(--muted);
+            margin-top: 12px;
             text-indent: 0;
         }
 
-        /* D2: Декоративный разделитель между главами */
-        .chapter-divider {
-            text-align: center;
-            font-size: 12pt;
-            color: var(--primary-color);
-            opacity: 0.45;
-            letter-spacing: 8px;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* ════════════════════════════════════════════
-           End Page / Back Cover
-           ════════════════════════════════════════════ */
+        /* ─────────── Послесловие / задняя обложка ─────────── */
         .back-cover {
             page: end-page;
+            position: relative;
             width: 148mm;
             height: 210mm;
-            box-sizing: border-box;
-            padding: 4cm 2cm 2cm 2cm;
-            background: var(--cover-bg);
-            color: var(--cover-text);
-            page-break-before: always;
             overflow: hidden;
-            position: relative;
+            background: var(--paper);
+            page-break-before: always;
+        }
+
+        .back-inner {
+            position: absolute;
+            z-index: 2;
+            top: 20mm;
+            left: 22mm;
+            width: 104mm;
+            height: 100mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             text-align: center;
         }
 
-        .decorative-divider {
+        .back-divider {
+            font-family: var(--display);
             font-size: 28pt;
-            color: var(--primary-color);
-            margin-bottom: 30px;
+            color: var(--accent);
+            opacity: 0.7;
+            margin-bottom: 26px;
         }
 
         .signature-text {
-            font-size: 16pt;
-            line-height: 1.8;
+            font-family: var(--display);
             font-style: italic;
-            color: var(--cover-text);
-            max-width: 80%;
-            margin: 0 auto;
-            font-family: var(--font-family);
-        }
-
-        body.theme-classic .signature-text {
-            font-family: "EB Garamond", "Georgia", serif;
-        }
-
-        .end-decorative {
-            font-size: 20pt;
-            margin-top: 30px;
-            opacity: 0.8;
+            font-size: 19pt;
+            line-height: 1.5;
+            color: var(--ink-soft);
+            width: 100%;
+            max-width: 92mm;
+            text-align: center;
         }
 
         .book-footer {
             position: absolute;
-            bottom: 3cm;
+            bottom: 20mm;
             left: 0;
             right: 0;
             text-align: center;
-            font-size: 10pt;
-            color: #888;
-            letter-spacing: 1px;
+            font-family: var(--display);
+            color: var(--muted);
+        }
+
+        .book-footer .title {
             text-transform: uppercase;
+            letter-spacing: 0.3em;
+            font-size: 11pt;
         }
 
         .book-footer .gen-date {
+            font-size: 10pt;
+            font-style: italic;
+            margin-top: 6px;
+            color: #a99a85;
+        }
+    </style>
+    {% elif theme == 'album' %}
+    <style>
+        /* ════════════════════════════════════════════════════════
+           ШАБЛОН: «Тёплый альбом»  (theme = "album")
+           Формат A5, рендер через WeasyPrint 60.x
+           ════════════════════════════════════════════════════════ */
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --paper: #faf4ea;
+            --ink: #34291f;
+            --ink-soft: #6a5847;
+            --muted: #9c8a76;
+            --terracotta: #b5502c;
+            --ochre: #d6a13f;
+            --hair: #e4d6c2;
+            --display: "DM Serif Display", "Georgia", serif;
+            --body: "Spectral", "Georgia", serif;
+            --label: "DM Sans", sans-serif;
+        }
+
+        /* ── Страницы ── */
+        @page {
+            size: A5;
+            margin: 18mm 17mm;
+            background-color: #faf4ea;
+
+            @bottom-left {
+                content: string(booktitle);
+                font-family: "DM Sans", sans-serif;
+                font-size: 9pt;
+                letter-spacing: 0.18em;
+                text-transform: uppercase;
+                color: #9c8a76;
+            }
+
+            @bottom-right {
+                content: counter(page);
+                font-family: "DM Sans", sans-serif;
+                font-size: 9pt;
+                letter-spacing: 0.18em;
+                color: #9c8a76;
+            }
+        }
+
+        @page cover-page {
+            size: A5;
+            margin: 0;
+            background-color: #faf4ea;
+
+            @bottom-left {
+                content: none;
+            }
+
+            @bottom-right {
+                content: none;
+            }
+        }
+
+        @page end-page {
+            size: A5;
+            margin: 0;
+            background-color: #faf4ea;
+
+            @bottom-left {
+                content: none;
+            }
+
+            @bottom-right {
+                content: none;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            background-color: transparent;
+        }
+
+        body {
+            font-family: var(--body);
+            color: var(--ink);
+            line-height: 1.6;
+            background: transparent;
+            /* протягиваем название книги в нижний колонтитул */
+            string-set: booktitle "{{ story_title }}";
+        }
+
+        /* ─────────── Обложка ─────────── */
+        .cover {
+            page: cover-page;
+            width: 148mm;
+            height: 210mm;
+            overflow: hidden;
+            background: var(--paper);
+            page-break-after: always;
+        }
+
+        .cover-inner {
+            height: 210mm;
+            padding: 24mm 20mm;
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .cover-tape {
+            height: 6px;
+            width: 70mm;
+            margin: 0 auto;
+            background: linear-gradient(90deg, var(--ochre), var(--terracotta));
+            border-radius: 3px;
+        }
+
+        .cover-kicker {
+            font-family: var(--label);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4em;
+            font-size: 10.5pt;
+            color: var(--terracotta);
+            margin-top: 28px;
+        }
+
+        .cover-center {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .cover h1 {
+            font-family: var(--display);
+            font-size: 50pt;
+            line-height: 1.04;
+            color: var(--ink);
+        }
+
+        .cover .subtitle {
+            font-family: var(--body);
+            font-style: italic;
+            font-size: 16pt;
+            color: var(--ink-soft);
+            margin-top: 22px;
+        }
+
+        .cover-seal {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            border: 1.5px solid var(--terracotta);
+            color: var(--terracotta);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--display);
+            font-size: 22pt;
+            margin: 26px auto 0;
+        }
+
+        .cover .dates {
+            font-family: var(--label);
+            font-weight: 500;
+            font-size: 11pt;
+            letter-spacing: 0.18em;
+            color: var(--muted);
+        }
+
+        /* ─────────── Содержание ─────────── */
+        .toc {
+            page-break-after: always;
+            padding-top: 4mm;
+        }
+
+        .eyebrow {
+            font-family: var(--label);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            font-size: 10pt;
+            color: var(--terracotta);
+        }
+
+        .h-section {
+            font-family: var(--display);
+            font-size: 34pt;
+            margin-top: 6px;
+            color: var(--ink);
+        }
+
+        .toc ul {
+            list-style: none;
+            margin-top: 26px;
+        }
+
+        .toc-item {
+            border-bottom: 1px solid var(--hair);
+        }
+
+        .toc-item a {
+            display: block;
+            padding: 15px 0;
+            text-decoration: none;
+            color: var(--ink);
+        }
+
+        .toc-no {
+            display: inline-block;
+            font-family: var(--display);
+            font-size: 24pt;
+            color: var(--terracotta);
+            line-height: 1;
+            width: 42px;
+            vertical-align: middle;
+        }
+
+        .toc-body {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .toc-title {
+            font-family: var(--body);
+            font-weight: 600;
+            font-size: 13.5pt;
+            color: var(--ink);
+        }
+
+        .toc-item a::after {
+            content: " " leader('.') " стр. " target-counter(attr(href), page);
+            font-family: var(--label);
+            font-weight: 600;
+            font-size: 11pt;
+            color: var(--ink-soft);
+        }
+
+        /* ─────────── Глава ─────────── */
+        .chapter {
+            page-break-before: always;
+            string-set: booktitle "{{ story_title }}";
+        }
+
+        .chapter-head {
+            margin-bottom: 12mm;
+        }
+
+        .chapter-band {
+            display: flex;
+            align-items: flex-end;
+            gap: 18px;
+        }
+
+        .chapter-no {
+            font-family: var(--display);
+            font-size: 72pt;
+            line-height: 0.8;
+            color: var(--terracotta);
+            flex: none;
+        }
+
+        .chapter-meta {
+            padding-bottom: 8px;
+        }
+
+        .chapter-meta h2 {
+            font-family: var(--display);
+            font-size: 28pt;
+            line-height: 1.05;
+            color: var(--ink);
+        }
+
+        .chapter-rule {
+            height: 3px;
+            width: 100%;
+            background: linear-gradient(90deg, var(--terracotta) 0 38%, var(--hair) 38%);
+            margin-top: 16px;
+        }
+
+        /* ─────────── Текст главы (chapter.story_html) ─────────── */
+        .chapter-story {
+            font-family: var(--body);
+            font-size: 12.5pt;
+            line-height: 1.82;
+            color: var(--ink-soft);
+        }
+
+        .chapter-story p {
+            margin-bottom: 14px;
+        }
+
+        .chapter-story p strong {
+            color: var(--ink);
+        }
+
+        .chapter-story>p:first-of-type::first-letter {
+            font-family: var(--display);
+            font-size: 2.3em;
+            line-height: 1;
+            color: var(--terracotta);
+            padding-right: 0.04em;
+        }
+
+        .chapter-story h2,
+        .chapter-story h3 {
+            font-family: var(--display);
+            color: var(--terracotta);
+            margin: 20px 0 8px;
+        }
+
+        .chapter-story hr {
+            border: none;
+            border-top: 1px solid var(--hair);
+            margin: 22px 0;
+            position: relative;
+        }
+
+        /* Фото внутри текста главы */
+        .chapter-story img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 22px auto 6px;
+            border-radius: 10px;
+        }
+
+        .chapter-story figure {
+            margin: 24px 0;
+            page-break-inside: avoid;
+        }
+
+        .chapter-story figcaption {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            font-family: var(--label);
+            font-size: 9.5pt;
+            color: var(--muted);
+        }
+
+        .chapter-story figcaption::before {
+            content: "";
+            width: 18px;
+            height: 2px;
+            background: var(--terracotta);
+            flex: none;
+        }
+
+        /* ─────────── Послесловие / задняя обложка ─────────── */
+        .back-cover {
+            page: end-page;
+            width: 148mm;
+            height: 210mm;
+            overflow: hidden;
+            background: var(--paper);
+            page-break-before: always;
+            position: relative;
+        }
+
+        .back-inner {
+            position: absolute;
+            z-index: 2;
+            top: 20mm;
+            left: 20mm;
+            width: 108mm;
+            height: 100mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .back-seal {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 1.5px solid var(--terracotta);
+            color: var(--terracotta);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--display);
+            font-size: 22pt;
+            margin-bottom: 28px;
+        }
+
+        .signature-text {
+            font-family: var(--display);
+            font-style: italic;
+            font-size: 20pt;
+            line-height: 1.45;
+            color: var(--ink);
+            width: 100%;
+        }
+
+        .book-footer {
+            position: absolute;
+            bottom: 20mm;
+            left: 0;
+            right: 0;
+            text-align: center;
+        }
+
+        .book-footer .title {
+            font-family: var(--label);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.28em;
+            font-size: 10pt;
+            color: var(--ink-soft);
+        }
+
+        .book-footer .gen-date {
+            font-family: var(--label);
+            font-size: 9pt;
+            margin-top: 6px;
+            color: var(--muted);
+        }
+    </style>
+    {% elif theme == 'modern' %}
+    <style>
+        /* ════════════════════════════════════════════════════════
+           ШАБЛОН: «Современное издание»  (theme = "modern")
+           Формат A5, рендер через WeasyPrint 60.x
+           ════════════════════════════════════════════════════════ */
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
+
+        :root {
+            --paper: #f9f8f4;
+            --ink: #1c1d1a;
+            --ink-soft: #44463f;
+            --muted: #8c8e84;
+            --pine: #1c6b5b;
+            --pine-deep: #14503f;
+            --hair: #e2e1d8;
+            --display: "Space Grotesk", "Helvetica Neue", sans-serif;
+            --body: "Source Serif 4", "Georgia", serif;
+        }
+
+        /* ── Страницы ── */
+        @page {
+            size: A5;
+            margin: 20mm 18mm 18mm;
+            background-color: #f9f8f4;
+
+            @top-left {
+                content: string(chaptertitle);
+                font-family: "Space Grotesk", sans-serif;
+                font-weight: 500;
+                font-size: 8pt;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                color: #8c8e84;
+                border-bottom: 1px solid var(--hair);
+                padding-bottom: 8px;
+                vertical-align: bottom;
+            }
+
+            @top-right {
+                content: string(booktitle);
+                font-family: "Space Grotesk", sans-serif;
+                font-weight: 500;
+                font-size: 8pt;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                color: #1c6b5b;
+                border-bottom: 1px solid var(--hair);
+                padding-bottom: 8px;
+                vertical-align: bottom;
+            }
+
+            @bottom-center {
+                content: counter(page);
+                font-family: "Space Grotesk", sans-serif;
+                font-weight: 500;
+                font-size: 9pt;
+                letter-spacing: 0.15em;
+                color: #8c8e84;
+            }
+        }
+
+        @page cover-page {
+            size: A5;
+            margin: 0;
+            background-color: #f9f8f4;
+
+            @top-left {
+                content: none;
+            }
+
+            @top-right {
+                content: none;
+            }
+
+            @bottom-center {
+                content: none;
+            }
+        }
+
+        @page end-page {
+            size: A5;
+            margin: 0;
+            background-color: #f9f8f4;
+
+            @top-left {
+                content: none;
+            }
+
+            @top-right {
+                content: none;
+            }
+
+            @bottom-center {
+                content: none;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            background-color: transparent;
+        }
+
+        body {
+            font-family: var(--body);
+            color: var(--ink);
+            line-height: 1.6;
+            background: transparent;
+            string-set: booktitle "{{ story_title }}";
+        }
+
+        /* ─────────── Обложка ─────────── */
+        .cover {
+            page: cover-page;
+            width: 148mm;
+            height: 210mm;
+            position: relative;
+            overflow: hidden;
+            background: var(--paper);
+            page-break-after: always;
+            page-break-inside: avoid;
+        }
+
+        .cover-inner {
+            position: relative;
+            height: 100%;
+            padding: 22mm 18mm 20mm;
+        }
+
+        .cover-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 9pt;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            color: var(--pine);
+        }
+
+        .cover-top .year {
+            color: var(--muted);
+        }
+
+        .cover-mid {
+            margin-top: 35mm;
+        }
+
+        .cover-tick {
+            width: 30px;
+            height: 4px;
+            background: var(--pine);
+            margin-bottom: 22px;
+        }
+
+        .cover h1 {
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 54pt;
+            line-height: 0.98;
+            letter-spacing: -0.02em;
+            color: var(--ink);
+        }
+
+        .cover h1 .dot {
+            color: var(--pine);
+        }
+
+        .cover .subtitle {
+            font-family: var(--body);
+            font-style: italic;
+            font-size: 16pt;
+            color: var(--ink-soft);
+            margin-top: 20px;
+            max-width: 88mm;
+        }
+
+        .cover-foot {
+            position: absolute;
+            bottom: 20mm;
+            left: 18mm;
+            right: 18mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 9.5pt;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+            border-top: 1px solid var(--hair);
+            padding-top: 12px;
+        }
+
+        /* ─────────── Содержание ─────────── */
+        .toc {
+            page-break-after: always;
+        }
+
+        .toc-label {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 9pt;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--pine);
+        }
+
+        .toc-title {
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 32pt;
+            letter-spacing: -0.01em;
+            margin-top: 8px;
+            margin-bottom: 26px;
+        }
+
+        .toc ul {
+            list-style: none;
+        }
+
+        .toc-item {
+            border-top: 1px solid var(--hair);
+        }
+
+        .toc-item:last-child {
+            border-bottom: 1px solid var(--hair);
+        }
+
+        .toc-item a {
+            display: block;
+            padding: 16px 0;
+            text-decoration: none;
+            color: var(--ink);
+        }
+
+        .toc-no {
+            display: inline-block;
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 11pt;
+            color: var(--pine);
+            width: 26px;
+            vertical-align: baseline;
+        }
+
+        .toc-name {
+            display: inline-block;
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 14pt;
+            color: var(--ink);
+            vertical-align: baseline;
+        }
+
+        .toc-item a::after {
+            content: " " leader('.') " " target-counter(attr(href), page);
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 11pt;
+            color: var(--ink-soft);
+        }
+
+        /* ─────────── Глава ─────────── */
+        .chapter {
+            page-break-before: always;
+        }
+
+        .chapter-head {
+            margin-bottom: 13mm;
+        }
+
+        .chapter-index {
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: 13pt;
+            letter-spacing: 0.06em;
+            color: var(--pine);
+        }
+
+        .chapter-index .slash {
+            color: var(--hair);
+            margin: 0 4px;
+        }
+
+        .chapter-head h2 {
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 33pt;
+            line-height: 1.04;
+            letter-spacing: -0.02em;
+            color: var(--ink);
+            margin-top: 12px;
+            /* протягиваем заголовок главы в верхний колонтитул */
+            string-set: chaptertitle content(text);
+        }
+
+        /* ─────────── Текст главы (chapter.story_html) ─────────── */
+        .chapter-story {
+            font-family: var(--body);
+            font-size: 12.5pt;
+            line-height: 1.8;
+            color: var(--ink-soft);
+        }
+
+        .chapter-story p {
+            margin-bottom: 14px;
+            text-indent: 1.25em;
+            text-align: justify;
+        }
+
+        /* Современный зачин: выделенная первая строка вместо буквицы */
+        .chapter-story>p:first-of-type {
+            color: var(--ink);
+            text-indent: 0;
+        }
+
+        .chapter-story>p:first-of-type::first-line {
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 0.95em;
+            letter-spacing: 0.05em;
+            color: var(--pine);
+        }
+
+        .chapter-story h2,
+        .chapter-story h3 {
+            font-family: var(--display);
+            font-weight: 600;
+            color: var(--ink);
+            margin: 22px 0 8px;
+            text-indent: 0;
+        }
+
+        .chapter-story hr {
+            border: none;
+            width: 44px;
+            height: 4px;
+            background: var(--pine);
+            margin: 18px 0;
+            text-indent: 0;
+        }
+
+        /* Фото внутри текста главы */
+        body {
+            counter-reset: photocounter;
+        }
+
+        .memory-photo-fullpage {
+            counter-increment: photocounter;
+            margin: 24px 0 !important;
+            page-break-inside: avoid;
+            text-indent: 0;
+        }
+
+        .memory-photo-fullpage img {
+            border: 1px solid var(--hair);
+            padding: 6px;
+            background: #fff;
+            max-width: 100% !important;
+            max-height: 380px !important;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .photo-caption {
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 9pt;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--pine);
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        .photo-caption::before {
+            content: "ФОТО " counter(photocounter, decimal-leading-zero) " · ";
+        }
+
+        .photo-date {
+            font-family: var(--display);
+            font-weight: 400;
             font-size: 8pt;
-            margin-top: 5px;
-            text-transform: none;
-            letter-spacing: 0;
-            color: #999;
+            letter-spacing: 0.08em;
+            color: var(--muted) !important;
+            margin-top: 4px;
+            text-align: center;
         }
-    </style>
-    {% if theme == 'classic' %}
-    <style>
-        @page {
-            background-color: #fdfbf7;
+
+        .chapter-story img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 22px auto 8px;
         }
-    </style>
-    {% else %}
-    <style>
-        @page {
-            background-color: #ffffff;
+
+        .chapter-story figure {
+            margin: 24px 0;
+            page-break-inside: avoid;
+            text-indent: 0;
+        }
+
+        .chapter-story figcaption {
+            margin-top: 10px;
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 8.5pt;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        /* ─────────── Послесловие / задняя обложка ─────────── */
+        .back-cover {
+            page: end-page;
+            width: 148mm;
+            height: 210mm;
+            position: relative;
+            overflow: hidden;
+            background: var(--paper);
+            color: var(--ink);
+            page-break-before: always;
+            page-break-inside: avoid;
+            page-break-after: avoid;
+        }
+
+        .back-inner {
+            position: absolute;
+            top: 0;
+            left: 18mm;
+            width: 112mm;
+            height: 210mm;
+            padding: 20mm 0 35mm;
+        }
+
+        .back-top {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 9pt;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            color: var(--pine);
+        }
+
+        .back-mid {
+            margin-top: 12mm;
+        }
+
+        .back-tick {
+            width: 30px;
+            height: 4px;
+            background: var(--pine);
+            opacity: 0.85;
+            margin-bottom: 26px;
+        }
+
+        .signature-text {
+            font-family: var(--body);
+            font-style: italic;
+            font-size: 21pt;
+            line-height: 1.45;
+            color: var(--ink);
+            width: 100%;
+        }
+
+        .back-foot {
+            position: absolute;
+            bottom: 18mm;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-family: var(--display);
+            font-weight: 500;
+            font-size: 9pt;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            border-top: 1px solid var(--hair);
+            padding-top: 12px;
+        }
+
+        .back-foot span:first-child {
+            max-width: 70mm;
+            text-align: left;
+            line-height: 1.3;
         }
     </style>
     {% endif %}
 </head>
 
 <body class="theme-{{ theme }}">
-    <!-- Cover Page (D5: typography-driven, no emoji) -->
+    {% if theme == 'literary' %}
+    <div class="page-frame"></div>
+    {% endif %}
+
+    {% set roman_nums = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'] %}
+
+    {% if theme == 'literary' %}
+    <!-- Обложка -->
     <div class="cover">
-        <div class="cover-ornament">— ✦ —</div>
-        <h1>{{ story_title }}</h1>
-        <div class="subtitle">Книга воспоминаний</div>
-        <div class="cover-line"></div>
-        <div class="dates">
-            {{ first_memory_date.strftime('%d.%m.%Y') }} — {{ last_memory_date.strftime('%d.%m.%Y') }}
+        <div class="cover-inner">
+            <div class="cover-kicker">Книга воспоминаний</div>
+            <div class="cover-mark">✦</div>
+            <h1>{{ story_title }}</h1>
+            <div class="cover-rule"></div>
+            {% if subtitle %}
+            <div class="subtitle">{{ subtitle }}</div>
+            <div class="cover-rule"></div>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Table of Contents -->
+    <!-- Содержание -->
     <div class="toc">
-        <h2>Содержание</h2>
+        <div class="section-eyebrow">Содержание</div>
+        <div class="section-title">Главы</div>
+        <div class="toc-rule"></div>
         <ul>
             {% for chapter in chapters %}
+            {% set parts = chapter.title.split(':', 1) %}
             <li class="toc-item">
                 <a href="#chapter-{{ loop.index }}">
-                    <span class="toc-name">
-                        Глава {{ loop.index }}. {{ chapter.title }}
-                    </span>
-                    <span class="toc-dots"></span>
-                    <span class="toc-page"></span>
+                    <span class="toc-num">{{ roman_nums[loop.index0] if loop.index0 < 15 else loop.index }}</span>
+                    <span class="toc-name">{{ parts[0] }}</span>
                 </a>
+                {% if parts|length > 1 %}
+                <div class="toc-subtitle">{{ parts[1].strip() }}</div>
+                {% endif %}
             </li>
             {% endfor %}
             <li class="toc-item">
                 <a href="#end-page">
+                    <span class="toc-num">✦</span>
                     <span class="toc-name">Послесловие</span>
-                    <span class="toc-dots"></span>
-                    <span class="toc-page"></span>
                 </a>
             </li>
         </ul>
     </div>
 
-    <!-- Chapters -->
+    <!-- Главы -->
     {% for chapter in chapters %}
-    {% if not loop.first %}
-    <div class="chapter-divider">✦ ✦ ✦</div>
-    {% endif %}
     <div class="chapter" id="chapter-{{ loop.index }}">
-        <div class="chapter-header">
+        <div class="chapter-head">
             <div class="chapter-num">Глава {{ loop.index }}</div>
             <h2>{{ chapter.title }}</h2>
         </div>
-
         <div class="chapter-story">
             {{ chapter.story_html | safe }}
         </div>
     </div>
     {% endfor %}
 
-    <!-- End Page / Back Cover -->
+    <!-- Послесловие -->
     <div class="back-cover" id="end-page">
-        <div class="decorative-divider">❦</div>
-
-        {% if signature %}
-        <div class="signature-text">
-            {{ signature }}
+        <div class="back-inner">
+            <div class="back-divider">❦</div>
+            <div class="signature-text">
+                {% if signature %}{{ signature }}{% else %}«Самое прекрасное в воспоминаниях то, что мы можем создавать
+                их каждый день, а хранить — всю жизнь.»{% endif %}
+            </div>
         </div>
-        {% else %}
-        <div class="signature-text">
-            «Самое прекрасное в воспоминаниях то, что вы можете создавать их каждый день, а хранить — всю жизнь.»
-        </div>
-        {% endif %}
-
-        <div class="end-decorative">✦</div>
-
         <div class="book-footer">
-            <p>{{ story_title }}</p>
+            <p class="title">{{ story_title }}</p>
             <p class="gen-date">Создано {{ generated_at.strftime('%d.%m.%Y') }}</p>
         </div>
     </div>
+
+    {% elif theme == 'album' %}
+    <!-- Обложка -->
+    <div class="cover">
+        <div class="cover-inner">
+            <div class="cover-tape"></div>
+            <div class="cover-kicker">Книга воспоминаний</div>
+            <div class="cover-center">
+                <h1>{{ story_title }}</h1>
+                {% if subtitle %}<div class="subtitle">{{ subtitle }}</div>{% endif %}
+                <div class="cover-seal">✦</div>
+            </div>
+            <div class="dates">
+                {{ first_memory_date.strftime('%d.%m.%Y') }} — {{ last_memory_date.strftime('%d.%m.%Y') }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Содержание -->
+    <div class="toc">
+        <div class="eyebrow">Содержание</div>
+        <div class="h-section">Главы</div>
+        <ul>
+            {% for chapter in chapters %}
+            <li class="toc-item">
+                <a href="#chapter-{{ loop.index }}">
+                    <span class="toc-no">{{ '%02d'|format(loop.index) }}</span>
+                    <span class="toc-body">
+                        <span class="toc-title">{{ chapter.title }}</span>
+                    </span>
+                </a>
+            </li>
+            {% endfor %}
+            <li class="toc-item">
+                <a href="#end-page">
+                    <span class="toc-no">✦</span>
+                    <span class="toc-body">
+                        <span class="toc-title">Послесловие</span>
+                    </span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Главы -->
+    {% for chapter in chapters %}
+    <div class="chapter" id="chapter-{{ loop.index }}">
+        <div class="chapter-head">
+            <div class="chapter-band">
+                <div class="chapter-no">{{ '%02d'|format(loop.index) }}</div>
+                <div class="chapter-meta">
+                    <h2>{{ chapter.title }}</h2>
+                </div>
+            </div>
+            <div class="chapter-rule"></div>
+        </div>
+        <div class="chapter-story">
+            {{ chapter.story_html | safe }}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Послесловие -->
+    <div class="back-cover" id="end-page">
+        <div class="back-inner">
+            <div class="back-seal">❦</div>
+            <div class="signature-text">
+                {% if signature %}{{ signature }}{% else %}«Самое прекрасное в воспоминаниях то, что мы можем создавать
+                их каждый день, а хранить — всю жизнь.»{% endif %}
+            </div>
+        </div>
+        <div class="book-footer">
+            <p class="title">{{ story_title }}</p>
+            <p class="gen-date">Создано {{ generated_at.strftime('%d.%m.%Y') }}</p>
+        </div>
+    </div>
+
+    {% elif theme == 'modern' %}
+    <!-- Обложка -->
+    <div class="cover">
+        <div class="cover-inner">
+            <div class="cover-top">
+                <span>Книга воспоминаний</span>
+                <span class="year">{{ first_memory_date.strftime('%Y') }}</span>
+            </div>
+            <div class="cover-mid">
+                <div class="cover-tick"></div>
+                <h1>{{ story_title }}<span class="dot">.</span></h1>
+                {% if subtitle %}<div class="subtitle">{{ subtitle }}</div>{% endif %}
+            </div>
+            <div class="cover-foot">
+                <span>{{ first_memory_date.strftime('%d.%m.%Y') }} — {{ last_memory_date.strftime('%d.%m.%Y') }}</span>
+                <span>Личное издание</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Содержание -->
+    <div class="toc">
+        <div class="toc-label">Содержание</div>
+        <div class="toc-title">Главы</div>
+        <ul>
+            {% for chapter in chapters %}
+            <li class="toc-item">
+                <a href="#chapter-{{ loop.index }}">
+                    <span class="toc-no">{{ '%02d'|format(loop.index) }}</span>
+                    <span class="toc-name">{{ chapter.title }}</span>
+                </a>
+            </li>
+            {% endfor %}
+            <li class="toc-item">
+                <a href="#end-page">
+                    <span class="toc-no">{{ '%02d'|format(chapters|length + 1) }}</span>
+                    <span class="toc-name">Послесловие</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Главы -->
+    {% for chapter in chapters %}
+    <div class="chapter" id="chapter-{{ loop.index }}">
+        <div class="chapter-head">
+            <div class="chapter-index">{{ '%02d'|format(loop.index) }}<span class="slash">/</span>{{
+                '%02d'|format(chapters|length) }}</div>
+            <h2>{{ chapter.title }}</h2>
+        </div>
+        <div class="chapter-story">
+            {{ chapter.story_html | safe }}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Послесловие -->
+    <div class="back-cover" id="end-page">
+        <div class="back-inner">
+            <div class="back-top">Книга воспоминаний · {{ first_memory_date.strftime('%Y') }}</div>
+            <div class="back-mid">
+                <div class="back-tick"></div>
+                <div class="signature-text">
+                    {% if signature %}{{ signature }}{% else %}«Самое прекрасное в воспоминаниях то, что мы можем
+                    создавать их каждый день, а хранить — всю жизнь.»{% endif %}
+                </div>
+            </div>
+            <div class="back-foot">
+                <span>{{ story_title }}</span>
+                <span>Создано {{ generated_at.strftime('%d.%m.%Y') }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 </body>
 
 </html>

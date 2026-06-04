@@ -12,15 +12,15 @@ from bot.states import StoryStates
 from bot.handlers.callbacks import start_book_generation
 
 async def handle_menu_button(message: Message, state: FSMContext) -> None:
-    """Handle main menu button clicks."""
+    """Handle main menu button clicks (legacy fallback)."""
     text = message.text
     
     if text == "🆕 Начать новую книгу":
         await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
         await message.answer(
-            "📝 <b>Новая книга</b>\n\n"
-            "Как вы хотите назвать эту книгу? (например, 'Отпуск в горах 2026' или 'Мои выходные')\n\n"
-            "<i>Все ваши дальнейшие воспоминания будут привязываться к ней.</i>",
+            "📝 <b>Создание новой книги</b>\n\n"
+            "Введите название для новой книги (например, <i>«Отпуск в горах 2026»</i> или <i>«Мои выходные»</i>).\n\n"
+            "<i>Все ваши дальнейшие воспоминания будут автоматически привязываться к ней.</i>",
             reply_markup=get_back_keyboard()
         )
         await state.set_state(StoryStates.waiting_for_story_title)
@@ -46,8 +46,7 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
         from bot.keyboards.main import get_stories_keyboard
         await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
         await message.answer(
-            "📂 <b>Ваши книги:</b>\n"
-            "<i>(выберите книгу для открытия Кабинета управления, редактирования глав и генерации PDF)</i>",
+            "📚 <b>Выберите книгу для открытия Кабинета управления (редактирование глав и генерация PDF):</b>",
             reply_markup=get_stories_keyboard(stories)
         )
         logger.info(f"User {message.from_user.id} clicked legacy stories button")
@@ -72,9 +71,9 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
             await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
             await message.answer(
                 f"👤 <b>Ваш профиль:</b>\n\n"
-                f"Уровень подписки: {tier}\n"
-                f"Осталось генераций PDF: <b>{credits}</b>\n\n"
-                f"<i>(Тестовый режим: у вас {credits} генераций)</i>",
+                f"• Подписка: <b>{tier}</b>\n"
+                f"• Доступно генераций PDF: <b>{credits}</b>\n\n"
+                f"Вы можете пополнить баланс генераций с помощью Telegram Stars.",
                 reply_markup=profile_kb
             )
             logger.info(f"User {message.from_user.id} clicked legacy profile button")
@@ -82,18 +81,11 @@ async def handle_menu_button(message: Message, state: FSMContext) -> None:
     elif text == "❓ Помощь":
         await message.answer("🔄 Переходим на инлайн-меню...", reply_markup=ReplyKeyboardRemove())
         await message.answer(
-            "ℹ️ <b>Как правильно пользоваться ботом:</b>\n\n"
-            "<b>Шаг 1: Создание книги</b>\n"
-            "Нажмите кнопку «🆕 Начать новую книгу» и задайте название. Бот начнет собирать все новые воспоминания в эту книгу.\n\n"
-            "<b>Шаг 2: Наполнение воспоминаниями</b>\n"
-            "Просто отправляйте боту фото, голосовые или текст. Вы можете редактировать/удалять отдельные воспоминания через команду /list.\n\n"
-            "<b>Шаг 3: Кабинет книги и редактирование глав</b>\n"
-            "Нажмите «📖 Сгенерировать PDF» или «📚 Архив книг» и выберите вашу книгу. Вы попадете в **Кабинет книги**:\n"
-            "• Нажмите <i>«📖 Читать / Редактировать главы»</i> — ИИ разобьет ваши записи на 3–5 смысловых глав с красивыми заголовками.\n"
-            "• Выберите главу, чтобы прочитать её. Вы можете нажать <i>«✏️ Изменить текст»</i> и отправить новые правки или нажать <i>«🔄 Перегенерировать ИИ»</i>, чтобы ИИ переписал главу заново.\n"
-            "• Нажмите <i>«🔄 Пересобрать книгу заново»</i>, если хотите полностью изменить структуру и сбросить правки.\n\n"
-            "<b>Шаг 4: Скачивание PDF</b>\n"
-            "В Кабинете книги нажмите <i>«🖨️ Сгенерировать PDF-книгу»</i>, выберите стиль оформления (Классика, Модерн, Бизнес), введите финальную подпись для задней обложки, и бот соберет для вас готовый файл!",
+            "ℹ️ <b>Краткое руководство по созданию вашей книги:</b>\n\n"
+            "• <b>Начало работы</b>: Создайте новую книгу через меню. Все ваши новые записи, голосовые сообщения и фото будут автоматически попадать в неё.\n"
+            "• <b>Кабинет книги</b>: Перейдите в <b>«📚 Мои книги»</b> и выберите нужный проект. Там вы можете запустить ИИ-генерацию глав, отредактировать их вручную или полностью пересобрать.\n"
+            "• <b>Скачивание PDF</b>: В Кабинете нажмите <b>«🖨️ Сгенерировать PDF»</b>, выберите стиль верстки и получите готовый макет для печати.\n\n"
+            "<i>Используйте команду /menu, чтобы вернуться на главный экран.</i>",
             reply_markup=get_help_keyboard()
         )
         logger.info(f"User {message.from_user.id} clicked legacy help button")
@@ -126,8 +118,8 @@ async def handle_story_title_input(message: Message, state: FSMContext) -> None:
         
     await state.clear()
     await message.answer(
-        f"✅ <b>История «{title}» создана!</b>\n\n"
-        f"Теперь все новые воспоминания будут сохраняться в неё.",
+        f"✅ <b>Книга «{title}» создана и установлена как текущая!</b>\n\n"
+        f"Все новые воспоминания будут автоматически сохраняться в неё.",
         reply_markup=get_main_menu_inline_keyboard()
     )
     logger.info(f"User {user_id_tg} created new story: {title}")
@@ -189,7 +181,7 @@ async def handle_text_message(message: Message, state: FSMContext) -> None:
     
     # Send confirmation
     story_context = f" в историю «{active_story.title}»" if active_story else ""
-    response = f"✅ <b>Воспоминание сохранено{story_context}!</b>\n\n📝 {text}"
+    response = f"✅ <b>Воспоминание сохранено{story_context}!</b>"
     if tags:
         response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
         

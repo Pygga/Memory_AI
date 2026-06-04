@@ -105,7 +105,7 @@ async def handle_voice_message(message: Message) -> None:
     
     # Send confirmation
     story_context = f" в историю «{active_story.title}»" if active_story else ""
-    response = f"✅ <b>Голосовая заметка сохранена{story_context}!</b>\n\n📝 {transcribed_text}"
+    response = f"✅ <b>Голосовая заметка сохранена{story_context}!</b>"
     if tags:
         response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
     

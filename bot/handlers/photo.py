@@ -59,11 +59,8 @@ async def handle_photo_message(message: Message) -> None:
     # Send confirmation
     story_context = f" в историю «{active_story.title}»" if active_story else ""
     response = f"✅ <b>Фотография сохранена{story_context}!</b>"
-    if caption:
-        response += f"\n📝 Описание: {caption}"
     if tags:
         response += f"\n🏷️ Теги: {', '.join(f'#{tag}' for tag in tags)}"
-    response += "\n\nФото будет включено в вашу книгу воспоминаний!"
     
     await message.answer(response)
     logger.info(f"Saved photo memory from user {user_id_tg}")
